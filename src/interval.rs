@@ -194,7 +194,7 @@ impl IntervalDnf {
     }
     */
 
-    fn meet(int1: Self, int2: Self) -> Self {
+    pub fn meet(int1: Self, int2: Self) -> Self {
         /*  Short circuit the meet:
              - 0 is an absorptive element
              - 1 is an identity element */

@@ -72,8 +72,7 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
             );
             let target = normalise_term(&ctx, &pi.target)?;
 
-            let pi = Pi::new(source, target);
-            Ok(Expr::Pi(pi))
+            Ok(Expr::pi(source, target))
         },
         Expr::Lambda(lambda) => {
             let source = normalise_term(ctx, &lambda.source)?;
@@ -84,22 +83,19 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
             );
             let body = normalise_term(&ctx, &lambda.body)?;
 
-            let lambda = Lambda::new(source, body);
-            Ok(Expr::Lambda(lambda))
+            Ok(Expr::lambda(source, body))
         },
         Expr::Path(path) => {
             let space = normalise_term(ctx, &path.space)?;
             let start = normalise_term(ctx, &path.start)?;
             let end = normalise_term(ctx, &path.end)?;
-            let path = Path::new(space, start, end);
-            Ok(Expr::Path(path))
+            Ok(Expr::path(space, start, end))
         },
         Expr::PathBind(path_bind) => {
             let ctx = ctx.bind_interval_var(&"".to_owned());
             let body = normalise_term(&ctx, &path_bind.body)?;
 
-            let path_bind = PathBind::new(body);
-            Ok(Expr::PathBind(path_bind))
+            Ok(Expr::path_bind(body))
         },
         Expr::UnitType => Ok(Expr::UnitType),
         Expr::UnitVal => Ok(Expr::UnitVal),

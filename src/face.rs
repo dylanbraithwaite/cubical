@@ -55,7 +55,7 @@ impl Face {
 
 }
 
-fn expand_interval_into_face(interval: &IntervalDnf, negated: bool) -> Face {
+pub fn expand_interval_into_face(interval: &IntervalDnf, negated: bool) -> Face {
     match &interval {
         IntervalDnf::One => if negated { Face::Bottom } else { Face::Top } ,
         IntervalDnf::Zero => if negated { Face::Top } else { Face::Bottom },

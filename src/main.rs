@@ -8,6 +8,7 @@ mod interval;
 mod context;
 mod elaborate;
 mod face;
+mod subst;
 
 use std::io::{BufRead, stdin};
 

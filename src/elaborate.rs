@@ -120,8 +120,7 @@ fn elaborate_face_system(ctx: &Context, system: &[(FaceSyntax, Syntax)]) -> Elab
         }
     }
 
-    let face_system = FaceSystem::new(faces);
-    let expr = Expr::System(face_system);
+    let expr = Expr::system(faces);
     // TODO
     // This fails on empty systems, but we don't do any type inference yet, so can't
     // do anything meaningful there without adding some type annotation syntax
@@ -139,13 +138,13 @@ fn face_system_is_total(_ctx: &Context, _system: &[(FaceSyntax, Syntax)]) -> boo
 fn elaborate_term_var(ctx: &Context, var: &str) -> ElaborationResult<Term> {
     match ctx.debruijnify(var) {
         Some((index, VarTarget::BoundTerm(ty))) => {
-            let expr = Expr::Var(Var::new(index));
+            let expr = Expr::var(index);
             let term = Term::new(expr, ty);
             Ok(term)
         },
 
         Some((index, VarTarget::Term(term))) => {
-            let expr = Expr::Var(Var::new(index));
+            let expr = Expr::var(index);
             let term = Term::new(expr, term.type_expr);
             Ok(term)
         },
@@ -172,8 +171,7 @@ fn elaborate_type_var(ctx: &Context, var: &str) -> ElaborationResult<Term> {
         Some((index, VarTarget::BoundTerm(Expr::Type)))
         // TODO: This doesn't work for type aliases:
         | Some((index, VarTarget::Term(_))) => {
-            let var = Var::new(index);
-            let expr = Expr::Var(var);
+            let expr = Expr::var(index);
             Ok(Term::new_type(expr))
         }
         Some(_) => Err(ElaborationErr::WrongVariableKind),
@@ -190,8 +188,7 @@ fn elaborate_pi(ctx: &Context, var: &str, source: &Syntax, target: &Syntax)
         target
     )?;
 
-    let pi = Pi::new(source, target);
-    let expr = Expr::Pi(pi);
+    let expr = Expr::pi(source, target);
 
     Ok(Term::new_type(expr))
 }
@@ -206,11 +203,9 @@ fn elaborate_lambda(ctx: &Context, var: &str, source: &Syntax, body: &Syntax)
     )?;
 
     let body_type = Term::new_type(body.type_expr.clone());
-    let pi = Pi::new(source.clone(), body_type);
-    let lambda_type_expr = Expr::Pi(pi);
+    let lambda_type_expr = Expr::pi(source.clone(), body_type);
 
-    let lambda = Lambda::new(source, body);
-    let lambda_expr = Expr::Lambda(lambda);
+    let lambda_expr = Expr::lambda(source, body);
 
     Ok(Term::new(lambda_expr, lambda_type_expr))
 }
@@ -228,8 +223,7 @@ fn elaborate_app(ctx: &Context, e1: &Syntax, e2: &Syntax) -> ElaborationResult<T
 
             let expr_ty = pi.target.expr.clone();
 
-            let appl = App::new(e1, e2);
-            let expr = Expr::App(appl);
+            let expr = Expr::app(e1, e2);
             let term = Term::new(expr, expr_ty);
 
             Ok(term)
@@ -238,8 +232,7 @@ fn elaborate_app(ctx: &Context, e1: &Syntax, e2: &Syntax) -> ElaborationResult<T
             let e2 = elaborate_interval(ctx, e2)?;
             let expr_ty = path.space.expr.clone();
 
-            let appl = PathApp::new(e1, e2);
-            let expr = Expr::PathApp(appl);
+            let expr = Expr::path_app(e1, e2);
             let term = Term::new(expr, expr_ty);
 
             Ok(term)
@@ -259,8 +252,7 @@ fn elaborate_path(ctx: &Context, space: &Syntax, start: &Syntax, end: &Syntax) -
         return Err(ElaborationErr::PathEndpointHasWrongType);
     }
 
-    let path_type = Path::new(space, start, end);
-    let type_expr = Expr::Path(path_type);
+    let type_expr = Expr::path(space, start, end);
 
     Ok(Term::new_type(type_expr))
 }
@@ -283,11 +275,8 @@ fn elaborate_path_bind(ctx: &Context, var: &str, body: &Syntax) -> ElaborationRe
         normalise_term(&ctx, &body).unwrap()
     };
 
-    let path_type = Path::new(path_space, path_start, path_end);
-    let path_type_expr = Expr::Path(path_type);
-
-    let path_bind = PathBind::new(body);
-    let expr = Expr::PathBind(path_bind);
+    let path_type_expr = Expr::path(path_space, path_start, path_end);
+    let expr = Expr::path_bind(body);
 
     Ok(Term::new(expr, path_type_expr))
 }

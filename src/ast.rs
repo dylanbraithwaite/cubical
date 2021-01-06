@@ -81,10 +81,52 @@ ast_types! {
     }
 }
 
+impl Expr {
+    pub fn var(debruijn_index: usize) -> Expr {
+        Expr::Var(Var::new(debruijn_index))
+    }
+
+    pub fn system<T>(faces: T) -> Expr
+        where T: Into<Vec<(Face, Expr)>>
+    {
+        Expr::System(FaceSystem::new(faces.into()))
+    }
+
+    pub fn pi(source: Term, target: Term) -> Expr {
+        Expr::Pi(Pi::new(source, target))
+    }
+
+    pub fn path(space: Term, start: Term, end: Term) -> Expr {
+        Expr::Path(Path::new(space, start, end))
+    }
+
+    pub fn path_bind(body: Term) -> Expr {
+        Expr::PathBind(PathBind::new(body))
+    }
+
+    pub fn lambda(space: Term, body: Term) -> Expr {
+        Expr::Lambda(Lambda::new(space, body))
+    }
+
+    pub fn app(func: Term, arg: Term) -> Expr {
+        Expr::App(App::new(func, arg))
+    }
+
+    pub fn path_app(func: Term, arg: IntervalDnf) -> Expr {
+        Expr::PathApp(PathApp::new(func, arg))
+    }
+}
+
 impl Var {
     pub fn new(index: usize) -> Self {
         Var {
             debruijn_index: index
+        }
+    }
+
+    pub fn increment(&self) -> Self {
+        Var {
+            debruijn_index: self.debruijn_index + 1
         }
     }
 }
