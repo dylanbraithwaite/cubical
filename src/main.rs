@@ -9,6 +9,7 @@ mod context;
 mod elaborate;
 mod face;
 mod subst;
+mod debruijn;
 
 use std::io::{BufRead, stdin};
 

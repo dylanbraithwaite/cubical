@@ -1,11 +1,11 @@
 use crate::util::types::ZeroOne;
 
-pub type Abstraction = (Variable, ExprBox, ExprBox);
+pub type Abstraction = (String, ExprBox, ExprBox);
 type ExprBox = Box<Expr>;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Expr {
-    Var(Variable),
+    Var(String),
     Pi(Abstraction),
     Lambda(Abstraction),
     App(ExprBox, ExprBox),
@@ -18,7 +18,8 @@ pub enum Expr {
     IntervalInvolution(ExprBox),
     IntervalMeet(ExprBox, ExprBox),
     IntervalJoin(ExprBox, ExprBox),
-    System(Vec<(Face, Expr)>)
+    System(Vec<(Face, Expr)>),
+    Comp(String, ExprBox, Vec<(Face, Expr)>, ExprBox),
 }
 
 pub type Variable = String;

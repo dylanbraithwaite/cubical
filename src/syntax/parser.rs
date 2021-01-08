@@ -115,6 +115,8 @@ where
             self.parse_expr_path_type()
         } else if self.next_tok_is(Token::PathBind) {
             self.parse_expr_path_binder()
+        } else if self.next_tok_is(Token::Comp) {
+            self.parse_expr_comp()
         } else if self.next_tok_is(Token::Meet) {
             self.parse_expr_meet()
         } else if self.next_tok_is(Token::Join) {
@@ -162,6 +164,15 @@ where
         Ok(Expr::PathBind(var_name, body))
     }
 
+    fn parse_expr_comp(&mut self) -> ParseResult<Expr> {
+        self.expect_tok(Token::Comp, "comp")?;
+        let var_name = self.parse_var_name("comp")?;
+        let type_expr = self.parse_expr_factor()?.boxed();
+        let faces = self.parse_face_system_inner()?;
+        let witness_expr = self.parse_expr_factor()?.boxed();
+        Ok(Expr::Comp(var_name, type_expr, faces, witness_expr))
+    }
+
     fn parse_expr_meet(&mut self) -> ParseResult<Expr> {
         self.expect_tok(Token::Meet, "meet")?;
         let i1 = self.parse_expr_factor()?.boxed();
@@ -207,6 +218,11 @@ where
     }
 
     fn parse_expr_face_system(&mut self) -> ParseResult<Expr> {
+        let vec = self.parse_face_system_inner()?;
+        Ok(Expr::System(vec))
+    }
+
+    fn parse_face_system_inner(&mut self) -> ParseResult<Vec<(Face, Expr)>> {
         self.expect_tok(Token::OpenBracket, "face_system")?;
         let mut vec = Vec::new();
         while !self.next_tok_is(Token::CloseBracket) {
@@ -217,7 +233,8 @@ where
             self.consume_if_next_tok(Token::Comma);
         }
         self.expect_tok(Token::CloseBracket, "face_system")?;
-        Ok(Expr::System(vec))
+
+        Ok(vec)
     }
 
     fn parse_face(&mut self) -> ParseResult<Face> {

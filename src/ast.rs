@@ -61,6 +61,24 @@ ast_types! {
         pub argument: Box<IntervalDnf>,
     }
 
+    pub struct Composition {
+        pub face_system: FaceSystem,
+        pub space: Box<Term>,
+        /// The witness at i=0 to the partial terms in the face system being extensible.
+        pub witness: Box<Term>,
+    }
+
+    /// Composition binds an interval variable, 'removing' it from the context, and
+    /// giving a term inhabiting the type at one endpoint of that direction ie: A[i/1].
+    /// Kan filling on the other hand, leaves the variable free in the context, giving
+    /// us a term inhabiting the interior of the cube, rather than just an endpoint
+    pub struct KanFill {
+        pub var: Var,
+
+        pub face_system: FaceSystem,
+        pub space: Box<Term>,
+        pub witness: Box<Term>,
+    }
 
     pub enum Expr {
         Var(Var),
@@ -77,6 +95,8 @@ ast_types! {
         Lambda(Lambda),
         App(App),
         PathApp(PathApp),
+        Comp(Composition),
+        Fill(KanFill),
         UnitVal,
     }
 }
@@ -115,6 +135,14 @@ impl Expr {
     pub fn path_app(func: Term, arg: IntervalDnf) -> Expr {
         Expr::PathApp(PathApp::new(func, arg))
     }
+
+    pub fn comp(space: Term, face_system: FaceSystem, witness: Term) -> Expr {
+        Expr::Comp(Composition::new(space, face_system, witness))
+    }
+
+    pub fn fill(var: Var, space: Term, face_system: FaceSystem, witness: Term) -> Expr {
+        Expr::Fill(KanFill::new(var, space, face_system, witness))
+    }
 }
 
 impl Var {
@@ -125,8 +153,12 @@ impl Var {
     }
 
     pub fn increment(&self) -> Self {
+        self.increment_by(1)
+    }
+
+    pub fn increment_by(&self, num: usize) -> Self {
         Var {
-            debruijn_index: self.debruijn_index + 1
+            debruijn_index: self.debruijn_index + num
         }
     }
 }
@@ -149,10 +181,41 @@ impl Term {
 
 // TODO: A derive macro for these?
 
+impl KanFill {
+    pub fn new(var: Var, space: Term, face_system: FaceSystem, witness: Term) -> Self {
+        KanFill {
+            var,
+            space: Box::new(space),
+            face_system,
+            witness: Box::new(witness),
+        }
+    }
+}
+impl Composition {
+
+    pub fn new(space: Term, face_system: FaceSystem, witness: Term) -> Self {
+        Composition {
+            space: Box::new(space),
+            face_system: face_system,
+            witness: Box::new(witness),
+        }
+    }
+}
+
 impl FaceSystem {
-    pub fn new(faces: Vec<(Face, Expr)>) -> Self {
+    pub fn new<T>(faces: T) -> Self
+        where T: Into<Vec<(Face, Expr)>>
+    {
         FaceSystem {
-            faces
+            faces: faces.into()
+        }
+    }
+
+    pub fn from_iter<T>(face_iter: T) -> Self 
+        where T: IntoIterator<Item = (Face, Expr)>
+    {
+        FaceSystem {
+            faces: face_iter.into_iter().collect()
         }
     }
 }
@@ -233,6 +296,8 @@ impl Display for Expr {
             Expr::App(app) => write!(f, "{}", app),
             Expr::PathApp(app) => write!(f, "{}", app),
             Expr::System(system) => write!(f, "{}", system),
+            Expr::Comp(comp) => write!(f, "{}", comp),
+            Expr::Fill(kan_fill) => write!(f, "{}", kan_fill),
         }
     }
 }
@@ -286,6 +351,18 @@ impl Display for FaceSystem {
             write!(f, " {} -> {},", face, expr)?;
         }
         write!(f, " ]")
+    }
+}
+
+impl Display for Composition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Comp _ ({}) {} ({})", self.space, self.face_system, self.witness)
+    }
+}
+
+impl Display for KanFill {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Fill {} {} {} {}", self.var, self.space, self.face_system, self.witness)
     }
 }
 

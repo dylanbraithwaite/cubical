@@ -18,7 +18,7 @@ fn subst_interval_in_interval(expr: IntervalDnf, var: Var, interval: IntervalDnf
     }
 }
 
-fn subst_interval_in_term(term: Term, var: Var, interval: IntervalDnf) -> Term {
+pub fn subst_interval_in_term(term: Term, var: Var, interval: IntervalDnf) -> Term {
     Term::new(
         subst_interval_in_expr(term.expr, var, interval.clone()),
         subst_interval_in_expr(term.type_expr, var, interval))
@@ -41,18 +41,17 @@ fn subst_interval_in_face(mut face: Face, var: Var, interval: IntervalDnf) -> Fa
 }
 
 fn subst_interval_in_system(system: FaceSystem, var: Var, interval: IntervalDnf) -> FaceSystem {
-    FaceSystem::new(
+    FaceSystem::from_iter(
         system.faces
             .into_iter()
             .map(|(face, expr)| (
                 subst_interval_in_face(face, var, interval.clone()),
                 subst_interval_in_expr(expr, var, interval.clone())
             ))
-            .collect()
     )
 }
 
-fn subst_interval_in_expr(expr: Expr, var: Var, interval: IntervalDnf) -> Expr {
+pub fn subst_interval_in_expr(expr: Expr, var: Var, interval: IntervalDnf) -> Expr {
     match expr {
         Expr::Var(v) => Expr::Var(v),
         Expr::Type => Expr::Type,
@@ -78,5 +77,14 @@ fn subst_interval_in_expr(expr: Expr, var: Var, interval: IntervalDnf) -> Expr {
             subst_interval_in_interval(*app.argument, var, interval)),
         Expr::System(system) => Expr::System(
             subst_interval_in_system(system, var, interval)),
+        Expr::Comp(comp) => Expr::comp(
+            subst_interval_in_term(*comp.space, var, interval.clone()),
+            subst_interval_in_system(comp.face_system, var, interval.clone()),
+            subst_interval_in_term(*comp.witness, var, interval)),
+        Expr::Fill(kan_fill) => Expr::fill(
+            kan_fill.var,
+            subst_interval_in_term(*kan_fill.space, var, interval.clone()),
+            subst_interval_in_system(kan_fill.face_system, var, interval.clone()),
+            subst_interval_in_term(*kan_fill.witness, var, interval))
     }
 }

@@ -20,5 +20,6 @@ pub enum Token<'src> {
     Inv,
     Path,
     PathBind,
+    Comp,
     VariableName(&'src str),
 }

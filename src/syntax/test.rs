@@ -112,6 +112,42 @@ fn test_parse_system() {
 }
 
 #[test]
+fn test_parse_comp() {
+    let src = "Comp foo (Pi (x: Unit) -> Unit) [(foo = 0) -> Lambda (x: Unit) => x, (foo = 1) -> Lambda (x: Unit) => ()] bar";
+    let expr = parse_from_source(src).unwrap();
+
+    let expected = Expr::Comp(
+        "foo".to_owned(),
+        Box::new(Expr::Pi((
+            "x".to_owned(),
+            Box::new(Expr::UnitType),
+            Box::new(Expr::UnitType),
+        ))),
+        vec! [
+            (
+                vec![("foo".to_owned(), ZeroOne::Zero)],
+                Expr::Lambda((
+                    "x".to_owned(),
+                    Box::new(Expr::UnitType),
+                    Box::new(Expr::Var("x".to_owned())),
+                ))
+            ),
+            (
+                vec![("foo".to_owned(), ZeroOne::One)],
+                Expr::Lambda((
+                    "x".to_owned(),
+                    Box::new(Expr::UnitType),
+                    Box::new(Expr::UnitVal),
+                ))
+            ),
+        ],
+        Box::new(Expr::Var("bar".to_owned()))
+    );
+
+    assert_eq!(expr, expected);
+}
+
+#[test]
 fn test_lambda_right_assoc() {
     let src = "Lambda (foo : Unit) => () ()";
     let expr = parse_from_source(src).unwrap();

@@ -18,7 +18,7 @@ ast_types! {
 }
 
 impl Face {
-    pub fn with_sides(sides: Vec<(Var, ZeroOne)>) -> Self {
+    pub fn with_sides(sides: &[(Var, ZeroOne)]) -> Self {
         let ones = filter_vals(&sides, ZeroOne::One);
         let zeroes = filter_vals(&sides, ZeroOne::Zero);
         Face::Conjunctions { ones, zeroes }

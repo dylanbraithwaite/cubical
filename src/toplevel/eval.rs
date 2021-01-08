@@ -25,9 +25,10 @@ pub fn execute_command(ctx: &mut Context, source: &str) -> Result<String, ReplEr
             },
             Command::TypeInfer(expr_source) => {
                 let expr = syntax::parse_from_source(expr_source).map_err(Parse)?;
-                let ast = elaborate_term(ctx, &expr).map_err(Elab)?;
-                let inferred_type = ast.type_expr;
-                Ok(format!("{}", inferred_type))
+                match elaborate_term(ctx, &expr) {
+                    Ok(ast) => Ok(format!("{}", ast.type_expr)),
+                    Err(err) => Ok(format!("{:?}", err))
+                }
             },
             Command::Define(var, expr_source) => {
                 let expr = syntax::parse_from_source(expr_source).map_err(Parse)?;

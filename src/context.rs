@@ -5,6 +5,7 @@ use crate::interval::IntervalDnf;
 use crate::ast::{Expr, Term, Var};
 use crate::face::Face;
 use crate::var_target::VarTarget;
+use crate::debruijn::*;
 
 #[derive(Clone, Debug)]
 enum CtxEntry {
@@ -84,11 +85,15 @@ impl Context {
         Context(ctx)
     }
 
-    pub fn index(&self, index: usize) -> Option<&VarTarget> {
+    pub fn index(&self, index: usize) -> Option<VarTarget> {
         let Context(ctx) = self;
         ctx.iter()
             .filter_map(|entry| match entry {
-                CtxEntry::Var(_, vt) => Some(vt),
+                CtxEntry::Var(_, VarTarget::Interval(int)) => Some(
+                    VarTarget::Interval(increment_debruijn_index_in_interval(index, int.clone()))),
+                CtxEntry::Var(_, VarTarget::Term(term)) => Some(
+                    VarTarget::Term(increment_debruijn_index_in_term(index, term.clone()))),
+                CtxEntry::Var(_, vt) => Some(vt.clone()),
                 CtxEntry::Face(_) => None,
             })
             .nth(index)

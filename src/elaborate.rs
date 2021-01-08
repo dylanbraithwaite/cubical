@@ -14,7 +14,7 @@ use crate::context::Context;
 
 #[derive(Debug)]
 pub enum ElaborationErr {
-    UnboundVariable,
+    UnboundVariable(String),
     WrongVariableKind,
     TypeInTermPosition,
     TermInTypePosition,
@@ -27,6 +27,9 @@ pub enum ElaborationErr {
     PartialFaceSystem,
     IncompatibleFaces,
     IncompatibleFaceTypes,
+    CompositionHasIncompatibleTypes,
+    CompositionHasIncompatibleFaces(String),
+    CompositionHasIncompatibleWitnessType,
 }
 
 type ElaborationResult<T> = Result<T, ElaborationErr>;
@@ -40,6 +43,7 @@ pub fn elaborate_type(ctx: &Context, syntax: &Syntax) -> ElaborationResult<Term>
         Syntax::Lambda(_)
         | Syntax::App(_,_)
         | Syntax::PathBind(_,_)
+        | Syntax::Comp(_, _, _, _)
         | Syntax::UnitVal => Err(ElaborationErr::TermInTypePosition),
         Syntax::IntervalInvolution(_)
         | Syntax::IntervalJoin(_,_)
@@ -66,7 +70,53 @@ pub fn elaborate_term(ctx: &Context, syntax: &Syntax) -> ElaborationResult<Term>
         | Syntax::IntervalOne
         | Syntax::IntervalZero => Err(ElaborationErr::IntervalInValuePosition),
         Syntax::System(system) => elaborate_face_system(ctx, system),
+        Syntax::Comp(var, ty, faces, witness) => elaborate_comp(ctx, var, ty, faces, witness),
     }
+}
+
+fn elaborate_comp(ctx: &Context, var: &str, ty: &Syntax, faces: &[(FaceSyntax, Syntax)],
+    witness: &Syntax) -> ElaborationResult<Term>
+{
+    let bound_ctx = ctx.bind_interval_var(var);
+    let ty = elaborate_type(&bound_ctx, ty)?;
+
+    let (faces, faces_type) = elaborate_face_system_inner(&bound_ctx, faces)?;
+
+    if faces_type != ty.expr {
+        return Err(ElaborationErr::CompositionHasIncompatibleTypes)
+    }
+
+    let witness = elaborate_term(&bound_ctx, witness)?;
+
+    let ty_i0 = normalise_expr(
+        &ctx.define_interval_var(var, IntervalDnf::Zero),
+        &ty.expr
+    ).unwrap();
+
+    if witness.type_expr != ty_i0 {
+        return Err(ElaborationErr::CompositionHasIncompatibleWitnessType)
+    }
+
+    for (face, expr) in &faces.faces {
+        if !exprs_equal_nf(
+            &ctx.define_interval_var(var, IntervalDnf::Zero).with_face_restriction(face),
+            &witness.expr,
+            expr)
+        {
+            return Err(ElaborationErr::CompositionHasIncompatibleFaces(
+                format!("{}  {}", witness.expr, expr)
+            ))
+        }
+    }
+
+    let ty_i1 = normalise_expr(
+        &ctx.define_interval_var(var, IntervalDnf::One),
+        &ty.expr
+    ).unwrap();
+
+    let expr = Expr::Comp(Composition::new(ty, faces, witness));
+    let term = Term::new(expr, ty_i1);
+    Ok(term)
 }
 
 /*
@@ -79,9 +129,20 @@ Typing rule for a face system: [f1: e1, f2: e2, ..., fn: en]
           ctx ⊢ [f1: e1, f2: e2, ..., fn: en] : A
 */
 fn elaborate_face_system(ctx: &Context, system: &[(FaceSyntax, Syntax)]) -> ElaborationResult<Term> {
+    let (face_system, system_type) = elaborate_face_system_inner(ctx, system)?;
+
+    // TODO
+    // To be consistent as a standalone expression, the extent of the system must be
+    // congruent to the top element
     if !face_system_is_total(ctx, system) {
         return Err(ElaborationErr::PartialFaceSystem)
     }
+
+    let expr = Expr::System(face_system);
+    Ok(Term::new(expr, system_type))
+}
+
+fn elaborate_face_system_inner(ctx: &Context, system: &[(FaceSyntax, Syntax)]) -> ElaborationResult<(FaceSystem, Expr)> {
 
     // Elaborate the face exprs and check every face in the face system has the same
     // type.
@@ -96,7 +157,7 @@ fn elaborate_face_system(ctx: &Context, system: &[(FaceSyntax, Syntax)]) -> Elab
                 _ => return Err(ElaborationErr::WrongVariableKind),
             }
         }
-        let face = Face::with_sides(sides_vec);
+        let face = Face::with_sides(&sides_vec);
 
         let ctx = &ctx.with_face_restriction(&face);
         let elaborated_side = elaborate_term(ctx, expr)?;
@@ -120,11 +181,11 @@ fn elaborate_face_system(ctx: &Context, system: &[(FaceSyntax, Syntax)]) -> Elab
         }
     }
 
-    let expr = Expr::system(faces);
+    let face_system = FaceSystem::new(faces);
     // TODO
     // This fails on empty systems, but we don't do any type inference yet, so can't
     // do anything meaningful there without adding some type annotation syntax
-    Ok(Term::new(expr, system_type.unwrap()))
+    Ok((face_system, system_type.unwrap()))
 }
 
 // FIXME
@@ -149,7 +210,7 @@ fn elaborate_term_var(ctx: &Context, var: &str) -> ElaborationResult<Term> {
             Ok(term)
         },
         Some(_) => Err(ElaborationErr::WrongVariableKind),
-        None => Err(ElaborationErr::UnboundVariable),
+        None => Err(ElaborationErr::UnboundVariable(var.into())),
     }
 }
 
@@ -162,7 +223,7 @@ fn elaborate_interval_var(ctx: &Context, var: &str) -> ElaborationResult<Interva
             Ok(interval)
         },
         Some(_) => Err(ElaborationErr::WrongVariableKind),
-        None => Err(ElaborationErr::UnboundVariable),
+        None => Err(ElaborationErr::UnboundVariable(var.into())),
     }
 }
 
@@ -175,7 +236,7 @@ fn elaborate_type_var(ctx: &Context, var: &str) -> ElaborationResult<Term> {
             Ok(Term::new_type(expr))
         }
         Some(_) => Err(ElaborationErr::WrongVariableKind),
-        None => Err(ElaborationErr::UnboundVariable),
+        None => Err(ElaborationErr::UnboundVariable(var.into())),
     }
 }
 

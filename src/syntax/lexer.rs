@@ -30,6 +30,7 @@ impl<'src> Iterator for Lexer<'src> {
             .or_else(|| self.lex_keyword(Token::Meet, "Meet"))
             .or_else(|| self.lex_keyword(Token::Join, "Join"))
             .or_else(|| self.lex_keyword(Token::Inv, "Inv"))
+            .or_else(|| self.lex_keyword(Token::Comp, "Comp"))
             .or_else(|| self.lex_while(Token::VariableName, char::is_alphabetic))
     }
 }
