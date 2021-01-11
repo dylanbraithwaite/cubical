@@ -9,6 +9,7 @@ use crate::util::assoc::Assoc;
 
 use crate::ast::Var;
 use crate::ast_types;
+use crate::context::Context;
 
 // Order vars by their de Bruijn indices
 // HashMap does not implement Hash, so we have to use BTreeMaps to represent
@@ -76,6 +77,17 @@ ast_types! {
     }
 }
 
+impl Conjunction {
+    fn remove_var(&mut self, var: Var) -> bool {
+        if let Some(entry) = self.atoms.iter().cloned().find(|(v, _)| *v == var) {
+            self.atoms.remove(&entry);
+            true
+        } else {
+            false
+        }
+    }
+}
+
 impl PartialOrd for Conjunction {
     fn partial_cmp(&self, other: &Conjunction) -> Option<std::cmp::Ordering> {
         let mut self_subset_other = true;
@@ -131,6 +143,39 @@ impl IntervalDnf {
             */
             IntervalNnf::Zero => IntervalDnf::Zero,
             IntervalNnf::One => IntervalDnf::One,
+        }
+    }
+
+    pub fn negate(&self) -> Self {
+        match self {
+            IntervalDnf::One => IntervalDnf::Zero,
+            IntervalDnf::Zero => IntervalDnf::One,
+            IntervalDnf::Conjunction(conjunction) => {
+                if conjunction.atoms.len() == 1 {
+                    let (var, negated) = conjunction.atoms.iter().next().unwrap();
+                    match negated {
+                        IsNegated::Negated => IntervalDnf::single(*var, IsNegated::NotNegated),
+                        IsNegated::NotNegated => IntervalDnf::single(*var, IsNegated::Negated),
+                    }
+                } else {
+                    unimplemented!("Disjunctions of interval variables not supported yet")
+                }
+            }
+        }
+    }
+
+    pub fn replace_var(&self, var: Var, val: IntervalDnf) -> IntervalDnf {
+        match self {
+            IntervalDnf::Zero => IntervalDnf::Zero,
+            IntervalDnf::One => IntervalDnf::One,
+            IntervalDnf::Conjunction(conjunction) => {
+                let mut conjunction = conjunction.clone();
+                if conjunction.remove_var(var) {
+                    IntervalDnf::meet(IntervalDnf::Conjunction(conjunction), val)
+                } else {
+                    IntervalDnf::Conjunction(conjunction)
+                }
+            }
         }
     }
 
@@ -255,5 +300,29 @@ fn push_in_negations(expr: &Interval) -> IntervalNnf {
         ),
         Interval::Zero => IntervalNnf::Zero,
         Interval::One => IntervalNnf::One,
+    }
+}
+
+pub fn normalise_interval(ctx: &Context, interval: &IntervalDnf) -> IntervalDnf {
+    match interval {
+        IntervalDnf::Zero => IntervalDnf::Zero,
+        IntervalDnf::One => IntervalDnf::One,
+        IntervalDnf::Conjunction(conjunction) => {
+            let mut ret = IntervalDnf::Conjunction(conjunction.clone());
+
+            for (var, negated) in &conjunction.atoms {
+                if let Some(mut interval) = ctx.lookup_interval(*var) {
+                    if *negated == IsNegated::Negated {
+                        interval = interval.negate();
+                    }
+                    ret = ret.replace_var(*var, interval);
+                }
+            }
+
+            match &ret {
+                IntervalDnf::Conjunction(conj) if conj.atoms.is_empty() => IntervalDnf::One,
+                _ => ret,
+            }
+        }
     }
 }

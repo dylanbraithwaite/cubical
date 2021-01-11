@@ -6,6 +6,7 @@ use crate::ast::{Expr, Term, Var};
 use crate::face::Face;
 use crate::var_target::VarTarget;
 use crate::debruijn::*;
+use crate::util::types::ZeroOne;
 
 #[derive(Clone, Debug)]
 enum CtxEntry {
@@ -38,7 +39,7 @@ impl Context {
             })
             .enumerate()
             .find(|(_, (u, _))| *u == var)
-            .map(|(i, (_, v))| (i, v.clone()))
+            .map(|(i, (_, v))| (i, increment_debruijn_index_in_var_target(i + 1, v.clone())))
     }
 
     pub fn define_term_var(&self, v: &str, term: &Term) -> Context {
@@ -85,18 +86,29 @@ impl Context {
         Context(ctx)
     }
 
-    pub fn index(&self, index: usize) -> Option<VarTarget> {
+    pub fn index(&self, i: usize) -> Option<VarTarget> {
         let Context(ctx) = self;
         ctx.iter()
             .filter_map(|entry| match entry {
-                CtxEntry::Var(_, VarTarget::Interval(int)) => Some(
-                    VarTarget::Interval(increment_debruijn_index_in_interval(index, int.clone()))),
-                CtxEntry::Var(_, VarTarget::Term(term)) => Some(
-                    VarTarget::Term(increment_debruijn_index_in_term(index, term.clone()))),
-                CtxEntry::Var(_, vt) => Some(vt.clone()),
+                CtxEntry::Var(_ , vt) => Some(
+                    increment_debruijn_index_in_var_target(i, vt.clone())),
                 CtxEntry::Face(_) => None,
             })
-            .nth(index)
+            .nth(i)
+    }
+
+    pub fn lookup_interval(&self, var: Var) -> Option<IntervalDnf> {
+        if let Some(VarTarget::Interval(interval)) = self.index(var.debruijn_index) {
+            Some(interval.clone())
+        } else if let Some(val) = self.combined_face_formula().lookup_var(var) {
+            if val == ZeroOne::Zero {
+                Some(IntervalDnf::Zero)
+            } else {
+                Some(IntervalDnf::One)
+            }
+        } else {
+            None
+        }
     }
 
     pub fn combined_face_formula(&self) -> Face {

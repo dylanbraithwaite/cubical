@@ -53,6 +53,22 @@ impl Face {
         }
     }
 
+    pub fn lookup_var(&self, var: Var) -> Option<ZeroOne> {
+        match self {
+            Face::Top => None,
+            Face::Bottom => Some(ZeroOne::Zero),
+            Face::Conjunctions { ones, zeroes } => {
+                if ones.contains(&var) {
+                    Some(ZeroOne::One)
+                } else if zeroes.contains(&var) {
+                    Some(ZeroOne::Zero)
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
 }
 
 pub fn expand_interval_into_face(interval: &IntervalDnf, negated: bool) -> Face {
@@ -87,7 +103,6 @@ fn normalise_face(ctx: &Context, face: &Face) -> Face {
             let mut zeroes = zeroes.clone();
             let mut accum = Face::Top;
             for (var, ref interval) in ctx.intervals() {
-                // TODO: Code duplication
                 if ones.remove(&var) {
                     accum = Face::meet(accum, expand_interval_into_face(interval, false));
                 }

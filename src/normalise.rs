@@ -2,7 +2,7 @@ use crate::var_target::VarTarget;
 use crate::ast::*;
 use crate::context::Context;
 use crate::face::{Face, faces_congruent};
-use crate::interval::{IntervalDnf, IsNegated};
+use crate::interval::{IntervalDnf, IsNegated, normalise_interval};
 use crate::subst::{subst_interval_in_expr, subst_interval_in_term};
 use crate::util::types::ZeroOne;
 use crate::debruijn::*;
@@ -32,7 +32,7 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
             VarTarget::Interval(_) => Err(EvalErr::WrongVariableKind),
             VarTarget::BoundInterval => Err(EvalErr::WrongVariableKind),
             VarTarget::BoundTerm(_) => Ok(Expr::Var(*x)),
-        },
+        }
         Expr::Type => Ok(Expr::Type),
         Expr::App(app) => {
             match normalise_expr(ctx, &app.func.expr)? {
@@ -98,12 +98,9 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
             }
         },
         Expr::PathApp(path_app) => {
-            // TODO: If the func is a variable with type (Path A x y) then should we normalise_expr it
-            // to x/y when the argument normalise_exprs to 0/1?
-            // Currently no because we don't allow irriducible applications, so we can
-            // always "substitute" it into the body anyway
             let path: &Term = &path_app.func;
-            let interval: &IntervalDnf = &path_app.argument;
+            let interval = normalise_interval(ctx, &path_app.argument);
+
 
             let normalised_path = normalise_term(ctx, &path)?;
 
@@ -111,16 +108,16 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
             if let Expr::PathBind(path_bind) = &normalised_path.expr {
                 let ctx = ctx.define_interval_var(
                     &"".to_owned(),
-                    *path_app.argument.clone()
+                    interval
                 );
                 return normalise_expr(&ctx, &path_bind.body.expr)
             }
 
             // Else if the interval value is 0 or 1, just take an endpoint from the path type
             if let Expr::Path(path) = &normalised_path.type_expr {
-                if interval == &IntervalDnf::One {
+                if interval == IntervalDnf::One {
                     return Ok(path.end.expr.clone())
-                } else if interval == &IntervalDnf::Zero {
+                } else if interval == IntervalDnf::Zero {
                     return Ok(path.start.expr.clone())
                 }
             }
@@ -207,8 +204,9 @@ fn normalise_path_comp(ctx: &EvalCtx, path_expr: &Path, face_system: &FaceSystem
 }
 
 fn normalise_comp(ctx: &EvalCtx, comp: &Composition) -> EvalResult<Expr> {
-    let space = normalise_term(ctx, &comp.space)?;
-    let system = normalise_system(ctx, &comp.face_system)?;
+    let bound_ctx = &ctx.bind_interval_var("");
+    let space = normalise_term(bound_ctx, &comp.space)?;
+    let system = normalise_system(bound_ctx, &comp.face_system)?;
     let witness = normalise_term(ctx, &comp.witness)?;
 
     if let Expr::System(system) = system {

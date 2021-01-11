@@ -1,6 +1,19 @@
 use crate::ast::*;
 use crate::interval::{IntervalDnf, Conjunction};
 use crate::face::{Face};
+use crate::var_target::VarTarget;
+
+pub fn increment_debruijn_index_in_var_target(num: usize, var_target: VarTarget) -> VarTarget {
+    match var_target {
+        VarTarget::Term(term) => VarTarget::Term(
+            increment_debruijn_index_in_term(num, term)),
+        VarTarget::Interval(int) => VarTarget::Interval(
+            increment_debruijn_index_in_interval(num, int)),
+        VarTarget::BoundTerm(ty) => VarTarget::BoundTerm(
+            increment_debruijn_index(num, ty)),
+        VarTarget::BoundInterval => VarTarget::BoundInterval,
+    }
+}
 
 pub fn increment_debruijn_index_in_term(num: usize, expr: Term) -> Term {
     Term::new(
