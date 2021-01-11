@@ -27,140 +27,14 @@ pub fn normalise_term(ctx: &EvalCtx, term: &Term) -> EvalResult<Term> {
 // TODO: Take advantage of this more and just panic in cases where bad state is just a logic error?
 pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
     match expr {
-        Expr::Var(x) => match ctx.index(x.debruijn_index).unwrap() {
-            VarTarget::Term(t) => normalise_expr(ctx, &t.expr),
-            VarTarget::Interval(_) => Err(EvalErr::WrongVariableKind),
-            VarTarget::BoundInterval => Err(EvalErr::WrongVariableKind),
-            VarTarget::BoundTerm(_) => Ok(Expr::Var(*x)),
-        }
+        Expr::Var(x) => normalise_var(ctx, x),
         Expr::Type => Ok(Expr::Type),
-        Expr::App(app) => {
-            match normalise_expr(ctx, &app.func.expr)? {
-                Expr::Lambda(lambda) => {
-                    let ctx = ctx.define_term_var("", &app.argument);
-                    normalise_expr(&ctx, &lambda.body.expr)
-                },
-                Expr::Comp(comp) => {
-                    // TODO: Needs tidied a lot!
-                    if let Expr::Pi(pi) = &comp.space.expr {
-                        let w = Expr::fill(
-                            Var::new(0),
-                            subst_interval_in_term(
-                                *pi.source.clone(),
-                                Var::new(0),
-                                IntervalDnf::single(Var::new(0), IsNegated::Negated)),
-                            FaceSystem::new([]),
-                            *app.argument.clone()
-                        );
-                        let w = normalise_expr(ctx, &w)?;
-
-                        let v = subst_interval_in_expr(w, Var::new(0),
-                            IntervalDnf::single(Var::new(0), IsNegated::Negated));
-                        let v = normalise_expr(ctx, &v)?;
-
-                        let v_term = Term::new(v.clone(), pi.source.expr.clone());
-
-                        let ctx_i = ctx.bind_interval_var("");
-                        let target_subst = normalise_term(
-                            &ctx_i.define_term_var("", &Term::new(
-                                increment_debruijn_index(1, v.clone()),
-                                increment_debruijn_index(1, pi.source.expr.clone()),
-                            )),
-                            &pi.target
-                        )?;
-                        let system = FaceSystem::from_iter(
-                            comp.face_system.faces
-                                .iter()
-                                .cloned()
-                                .map(|(face, expr)| (face, Expr::app(
-                                    Term::new(expr, comp.space.expr.clone()),
-                                    v_term.clone()
-                                )))
-                        );
-                        let witness = Expr::app(
-                            *comp.witness.clone(),
-                            subst_interval_in_term(v_term, Var::new(0), IntervalDnf::Zero)
-                        );
-                        let target_subst_i0 = subst_interval_in_expr(target_subst.expr.clone(),
-                            Var::new(1), IntervalDnf::Zero);
-                        Ok(Expr::comp(target_subst, system, Term::new(witness, target_subst_i0)))
-                    } else {
-                        Err(EvalErr::ApplicableDidNotReduce)
-                    }
-                }
-                _ => {
-                    // TODO: Should we allow irreducable applications?
-                    // Currently we should never be able to get into a state where we are trying to reduce something like
-                    // [f : A -> B, x : A]  |-  f x : B
-                    // without a value bound to f in the context
-                    Err(EvalErr::ApplicableDidNotReduce)
-                }
-            }
-        },
-        Expr::PathApp(path_app) => {
-            let path: &Term = &path_app.func;
-            let interval = normalise_interval(ctx, &path_app.argument);
-
-
-            let normalised_path = normalise_term(ctx, &path)?;
-
-            // If we have a PathBind expression, we can directly apply the application
-            if let Expr::PathBind(path_bind) = &normalised_path.expr {
-                let ctx = ctx.define_interval_var(
-                    &"".to_owned(),
-                    interval
-                );
-                return normalise_expr(&ctx, &path_bind.body.expr)
-            }
-
-            // Else if the interval value is 0 or 1, just take an endpoint from the path type
-            if let Expr::Path(path) = &normalised_path.type_expr {
-                if interval == IntervalDnf::One {
-                    return Ok(path.end.expr.clone())
-                } else if interval == IntervalDnf::Zero {
-                    return Ok(path.start.expr.clone())
-                }
-            }
-
-            // Else just normalise the path bind
-            Ok(Expr::path_app(normalised_path, interval.clone()))
-        },
-
-        // Normalise under lambdas etc so we truly have a normal form for equality checking
-        Expr::Pi(pi) => {
-            let source = normalise_term(ctx, &pi.source)?;
-
-            let ctx = ctx.bind_term_var(
-                &"".to_owned(),
-                &source.expr
-            );
-            let target = normalise_term(&ctx, &pi.target)?;
-
-            Ok(Expr::pi(source, target))
-        },
-        Expr::Lambda(lambda) => {
-            let source = normalise_term(ctx, &lambda.source)?;
-
-            let ctx = ctx.bind_term_var(
-                &"".to_owned(),
-                &source.expr
-            );
-            let body = normalise_term(&ctx, &lambda.body)?;
-
-            Ok(Expr::lambda(source, body))
-        },
-        Expr::Path(path) => {
-            let space = normalise_term(ctx, &path.space)?;
-            let start = normalise_term(ctx, &path.start)?;
-            let end = normalise_term(ctx, &path.end)?;
-            Ok(Expr::path(space, start, end))
-        },
-        Expr::PathBind(path_bind) => {
-            let ctx = ctx.bind_interval_var(&"".to_owned());
-            let body = normalise_term(&ctx, &path_bind.body)?;
-
-            Ok(Expr::path_bind(body))
-        },
+        Expr::App(app) => normalise_app(ctx, app),
+        Expr::PathApp(path_app) => normalise_path_app(ctx, path_app),
+        Expr::Pi(pi) => normalise_pi(ctx, pi),
+        Expr::Lambda(lambda) => normalise_lambda(ctx, lambda),
+        Expr::Path(path) => normalise_path(ctx, path),
+        Expr::PathBind(path_bind) => normalise_path_bind(ctx, path_bind),
         Expr::UnitType => Ok(Expr::UnitType),
         Expr::UnitVal => Ok(Expr::UnitVal),
         Expr::System(system) => normalise_system(ctx, system),
@@ -169,8 +43,150 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
     }
 }
 
+fn normalise_var(ctx: &EvalCtx, var: &Var) -> EvalResult<Expr> {
+    match ctx.index(var.debruijn_index).unwrap() {
+        VarTarget::Term(t) => normalise_expr(ctx, &t.expr),
+        VarTarget::Interval(_) => Err(EvalErr::WrongVariableKind),
+        VarTarget::BoundInterval => Err(EvalErr::WrongVariableKind),
+        VarTarget::BoundTerm(_) => Ok(Expr::Var(*var)),
+    }
+}
+
+fn normalise_app(ctx: &EvalCtx, app: &App) -> EvalResult<Expr> {
+    match normalise_expr(ctx, &app.func.expr)? {
+        Expr::Lambda(lambda) => {
+            let ctx = ctx.define_term_var("", &app.argument);
+            normalise_expr(&ctx, &lambda.body.expr)
+        },
+        Expr::Comp(comp) => {
+            // TODO: Needs tidied a lot!
+            if let Expr::Pi(pi) = &comp.space.expr {
+                let w = Expr::fill(
+                    Var::new(0),
+                    subst_interval_in_term(
+                        *pi.source.clone(),
+                        Var::new(0),
+                        IntervalDnf::single(Var::new(0), IsNegated::Negated)),
+                    FaceSystem::new([]),
+                    *app.argument.clone()
+                );
+                let w = normalise_expr(ctx, &w)?;
+
+                let v = subst_interval_in_expr(w, Var::new(0),
+                    IntervalDnf::single(Var::new(0), IsNegated::Negated));
+                let v = normalise_expr(ctx, &v)?;
+
+                let v_term = Term::new(v.clone(), pi.source.expr.clone());
+
+                let ctx_i = ctx.bind_interval_var("");
+                let target_subst = normalise_term(
+                    &ctx_i.define_term_var("", &Term::new(
+                        increment_debruijn_index(1, v.clone()),
+                        increment_debruijn_index(1, pi.source.expr.clone()),
+                    )),
+                    &pi.target
+                )?;
+                let system = FaceSystem::from_iter(
+                    comp.face_system.faces
+                        .iter()
+                        .cloned()
+                        .map(|(face, expr)| (face, Expr::app(
+                            Term::new(expr, comp.space.expr.clone()),
+                            v_term.clone()
+                        )))
+                );
+                let witness = Expr::app(
+                    *comp.witness.clone(),
+                    subst_interval_in_term(v_term, Var::new(0), IntervalDnf::Zero)
+                );
+                let target_subst_i0 = subst_interval_in_expr(target_subst.expr.clone(),
+                    Var::new(1), IntervalDnf::Zero);
+                Ok(Expr::comp(target_subst, system, Term::new(witness, target_subst_i0)))
+            } else {
+                Err(EvalErr::ApplicableDidNotReduce)
+            }
+        }
+        _ => {
+            // TODO: Should we allow irreducable applications?
+            // Currently we should never be able to get into a state where we are trying to reduce something like
+            // [f : A -> B, x : A]  |-  f x : B
+            // without a value bound to f in the context
+            Err(EvalErr::ApplicableDidNotReduce)
+        }
+    }
+}
+
+fn normalise_path_app(ctx: &EvalCtx, path_app: &PathApp) -> EvalResult<Expr> {
+    let path: &Term = &path_app.func;
+    let interval = normalise_interval(ctx, &path_app.argument);
+
+
+    let normalised_path = normalise_term(ctx, &path)?;
+
+    // If we have a PathBind expression, we can directly apply the application
+    if let Expr::PathBind(path_bind) = &normalised_path.expr {
+        let ctx = ctx.define_interval_var(
+            &"".to_owned(),
+            interval
+        );
+        return normalise_expr(&ctx, &path_bind.body.expr)
+    }
+
+    // Else if the interval value is 0 or 1, just take an endpoint from the path type
+    if let Expr::Path(path) = &normalised_path.type_expr {
+        if interval == IntervalDnf::One {
+            return Ok(path.end.expr.clone())
+        } else if interval == IntervalDnf::Zero {
+            return Ok(path.start.expr.clone())
+        }
+    }
+
+    // Else just normalise the path bind
+    Ok(Expr::path_app(normalised_path, interval.clone()))
+}
+
+fn normalise_pi(ctx: &EvalCtx, pi: &Pi) -> EvalResult<Expr> {
+    let source = normalise_term(ctx, &pi.source)?;
+
+    let ctx = ctx.bind_term_var(
+        &"".to_owned(),
+        &source.expr
+    );
+    let target = normalise_term(&ctx, &pi.target)?;
+
+    Ok(Expr::pi(source, target))
+}
+
+fn normalise_lambda(ctx: &EvalCtx, lambda: &Lambda) -> EvalResult<Expr> {
+    let source = normalise_term(ctx, &lambda.source)?;
+
+    let ctx = ctx.bind_term_var(
+        &"".to_owned(),
+        &source.expr
+    );
+    let body = normalise_term(&ctx, &lambda.body)?;
+
+    Ok(Expr::lambda(source, body))
+}
+
+fn normalise_path(ctx: &EvalCtx, path: &Path) -> EvalResult<Expr> {
+    let space = normalise_term(ctx, &path.space)?;
+    let start = normalise_term(ctx, &path.start)?;
+    let end = normalise_term(ctx, &path.end)?;
+    Ok(Expr::path(space, start, end))
+}
+
+fn normalise_path_bind(ctx: &EvalCtx, path_bind: &PathBind) -> EvalResult<Expr> {
+    let ctx = ctx.bind_interval_var(&"".to_owned());
+    let body = normalise_term(&ctx, &path_bind.body)?;
+
+    Ok(Expr::path_bind(body))
+}
+
 // TODO: Tidy this up a bit
-fn normalise_path_comp(ctx: &EvalCtx, path_expr: &Path, face_system: &FaceSystem, witness: &Term) -> EvalResult<Expr> {
+fn normalise_path_comp(ctx: &EvalCtx, path_expr: &Path, face_system: &FaceSystem,
+        witness: &Term) -> EvalResult<Expr>
+{
     let path_i1 = subst_interval_in_expr(Expr::Path(path_expr.clone()), Var::new(1), IntervalDnf::One);
     let space_i1 = subst_interval_in_expr(path_expr.space.expr.clone(), Var::new(1), IntervalDnf::One);
     let j_int = IntervalDnf::single(Var::new(0), IsNegated::NotNegated);
@@ -245,8 +261,6 @@ fn subst_degeneracy_into_system(face_system: FaceSystem, witness: Expr, var: Var
 }
 
 fn normalise_kan_fill(ctx: &EvalCtx, kan_fill: KanFill) -> EvalResult<Expr> {
-    //let degeneracy_ctx = ctx.define_interval_var(&var, degeneracy);
-    //let degeneracy_ctx = ctx.define_interval_var(kan_fill.var, interval: IntervalDnf)
     let var = kan_fill.var;
     let witness = *kan_fill.witness;
     let face_system = subst_degeneracy_into_system(kan_fill.face_system, witness.expr.clone(), var)?;
