@@ -63,6 +63,16 @@ pub fn subst_interval_in_expr(expr: Expr, var: Var, interval: IntervalDnf) -> Ex
         Expr::Lambda(lambda) => Expr::lambda(
             subst_interval_in_term(*lambda.source, var, interval.clone()),
             subst_interval_in_term(*lambda.body, var.increment(), interval)),
+        Expr::Sigma(sigma) => Expr::sigma(
+            subst_interval_in_term(*sigma.left_type, var, interval.clone()),
+            subst_interval_in_term(*sigma.right_type, var.increment(), interval)),
+        Expr::Pair(pair) => Expr::pair(
+            subst_interval_in_term(*pair.left, var, interval.clone()),
+            subst_interval_in_term(*pair.right, var, interval)),
+        Expr::LeftProj(lproj) => Expr::left_proj(
+            subst_interval_in_term(*lproj.pair, var, interval)),
+        Expr::RightProj(rproj) => Expr::right_proj(
+            subst_interval_in_term(*rproj.pair, var, interval)),
         Expr::Path(path) => Expr::path(
             subst_interval_in_term(*path.space, var, interval.clone()),
             subst_interval_in_term(*path.start, var, interval.clone()),

@@ -36,6 +36,11 @@ ast_types! {
         pub target: Box<Term>,
     }
 
+    pub struct Sigma {
+        pub left_type: Box<Term>,
+        pub right_type: Box<Term>
+    }
+
     pub struct Path {
         pub space: Box<Term>,
         pub start: Box<Term>,
@@ -49,6 +54,19 @@ ast_types! {
     pub struct Lambda {
         pub source: Box<Term>,
         pub body: Box<Term>,
+    }
+
+    pub struct Pair {
+        pub left: Box<Term>,
+        pub right: Box<Term>,
+    }
+
+    pub struct LeftProj {
+        pub pair: Box<Term>,
+    }
+
+    pub struct RightProj {
+        pub pair: Box<Term>,
     }
 
     pub struct App {
@@ -88,6 +106,7 @@ ast_types! {
         // Types
         Pi(Pi),
         Path(Path),
+        Sigma(Sigma),
         UnitType,
 
         // Exprs
@@ -95,6 +114,9 @@ ast_types! {
         Lambda(Lambda),
         App(App),
         PathApp(PathApp),
+        Pair(Pair),
+        LeftProj(LeftProj),
+        RightProj(RightProj),
         Comp(Composition),
         Fill(KanFill),
         UnitVal,
@@ -142,6 +164,22 @@ impl Expr {
 
     pub fn fill(var: Var, space: Term, face_system: FaceSystem, witness: Term) -> Expr {
         Expr::Fill(KanFill::new(var, space, face_system, witness))
+    }
+
+    pub fn sigma(left_type: Term, right_type: Term) -> Expr {
+        Expr::Sigma(Sigma::new(left_type, right_type))
+    }
+
+    pub fn pair(left: Term, right: Term) -> Expr {
+        Expr::Pair(Pair::new(left, right))
+    }
+
+    pub fn left_proj(pair: Term) -> Expr {
+        Expr::LeftProj(LeftProj::new(pair))
+    }
+
+    pub fn right_proj(pair: Term) -> Expr {
+        Expr::RightProj(RightProj::new(pair))
     }
 }
 
@@ -229,6 +267,40 @@ impl Pi {
     }
 }
 
+impl Sigma {
+    pub fn new(left_type: Term, right_type: Term) -> Self {
+        Sigma {
+            left_type: Box::new(left_type),
+            right_type: Box::new(right_type),
+        }
+    }
+}
+
+impl Pair {
+    pub fn new(left: Term, right: Term) -> Self {
+        Pair {
+            left: Box::new(left),
+            right: Box::new(right),
+        }
+    }
+}
+
+impl LeftProj {
+    pub fn new(pair: Term) -> Self {
+        LeftProj {
+            pair: Box::new(pair),
+        }
+    }
+}
+
+impl RightProj {
+    pub fn new(pair: Term) -> Self {
+        RightProj {
+            pair: Box::new(pair),
+        }
+    }
+}
+
 impl Path {
     pub fn new(space: Term, start: Term, end: Term) -> Self {
         Path {
@@ -290,10 +362,14 @@ impl Display for Expr {
             Expr::UnitType => write!(f, "Unit"),
             Expr::UnitVal => write!(f, "()"),
             Expr::Pi(pi) => write!(f, "{}", pi),
+            Expr::Sigma(sigma) => write!(f, "{}", sigma),
             Expr::Lambda(lambda) => write!(f, "{}", lambda),
             Expr::Path(path) => write!(f, "{}", path),
             Expr::PathBind(path_bind) => write!(f, "{}", path_bind),
             Expr::App(app) => write!(f, "{}", app),
+            Expr::Pair(pair) => write!(f, "{}", pair),
+            Expr::LeftProj(left_proj) => write!(f, "{}", left_proj),
+            Expr::RightProj(right_proj) => write!(f, "{}", right_proj),
             Expr::PathApp(app) => write!(f, "{}", app),
             Expr::System(system) => write!(f, "{}", system),
             Expr::Comp(comp) => write!(f, "{}", comp),
@@ -323,6 +399,30 @@ impl Display for Lambda {
 impl Display for Path {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Path {} {} {}", self.space.expr, self.start.expr, self.end.expr)
+    }
+}
+
+impl Display for Sigma {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Sigma (_: {}) {}", self.left_type, self.right_type)
+    }
+}
+
+impl Display for Pair {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "({}, {})", self.left, self.right)
+    }
+}
+
+impl Display for LeftProj {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "ProjL {}", self.pair)
+    }
+}
+
+impl Display for RightProj {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "ProjL {}", self.pair)
     }
 }
 

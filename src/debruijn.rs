@@ -74,6 +74,16 @@ pub fn increment_debruijn_index(num: usize, expr: Expr) -> Expr {
         Expr::App(app) => Expr::app(
             increment_debruijn_index_in_term(num, *app.func),
             increment_debruijn_index_in_term(num, *app.argument)),
+        Expr::Sigma(sigma) => Expr::sigma(
+            increment_debruijn_index_in_term(num, *sigma.left_type),
+            increment_debruijn_index_in_term(num, *sigma.right_type)),
+        Expr::Pair(pair) => Expr::pair(
+            increment_debruijn_index_in_term(num, *pair.left),
+            increment_debruijn_index_in_term(num, *pair.right)),
+        Expr::LeftProj(lproj) => Expr::left_proj(
+            increment_debruijn_index_in_term(num, *lproj.pair)),
+        Expr::RightProj(rproj) => Expr::right_proj(
+            increment_debruijn_index_in_term(num, *rproj.pair)),
         Expr::Path(path) => Expr::path(
             increment_debruijn_index_in_term(num, *path.space),
             increment_debruijn_index_in_term(num, *path.start),

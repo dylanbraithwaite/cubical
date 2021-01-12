@@ -33,6 +33,10 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
         Expr::PathApp(path_app) => normalise_path_app(ctx, path_app),
         Expr::Pi(pi) => normalise_pi(ctx, pi),
         Expr::Lambda(lambda) => normalise_lambda(ctx, lambda),
+        Expr::Sigma(sigma) => normalise_sigma(ctx, sigma),
+        Expr::Pair(pair) => normalise_pair(ctx, pair),
+        Expr::LeftProj(lproj) => normalise_left_proj(ctx, lproj),
+        Expr::RightProj(rproj) => normalise_right_proj(ctx, rproj),
         Expr::Path(path) => normalise_path(ctx, path),
         Expr::PathBind(path_bind) => normalise_path_bind(ctx, path_bind),
         Expr::UnitType => Ok(Expr::UnitType),
@@ -40,6 +44,40 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
         Expr::System(system) => normalise_system(ctx, system),
         Expr::Comp(comp) => normalise_comp(ctx, comp),
         Expr::Fill(kan_fill) => normalise_kan_fill(ctx, kan_fill.clone()),
+    }
+}
+
+fn normalise_sigma(ctx: &EvalCtx, sigma: &Sigma) -> EvalResult<Expr> {
+    Ok(Expr::sigma(
+        normalise_term(ctx, &sigma.left_type)?,
+        normalise_term(&ctx.bind_term_var("", &sigma.left_type.expr), &sigma.right_type)?,
+    ))
+}
+
+fn normalise_pair(ctx: &EvalCtx, pair: &Pair) -> EvalResult<Expr> {
+    Ok(Expr::pair(
+        normalise_term(ctx, &pair.left)?,
+        normalise_term(ctx, &pair.right)?,
+    ))
+}
+
+fn normalise_left_proj(ctx: &EvalCtx, left_proj: &LeftProj) -> EvalResult<Expr> {
+    let pair = normalise_term(ctx, &left_proj.pair)?;
+
+    if let Expr::Pair(pair) = pair.expr {
+        Ok(pair.left.expr.clone())
+    } else {
+        Ok(Expr::left_proj(pair))
+    }
+}
+
+fn normalise_right_proj(ctx: &EvalCtx, right_proj: &RightProj) -> EvalResult<Expr> {
+    let pair = normalise_term(ctx, &right_proj.pair)?;
+
+    if let Expr::Pair(pair) = pair.expr {
+        Ok(pair.right.expr.clone())
+    } else {
+        Ok(Expr::right_proj(pair))
     }
 }
 
@@ -219,6 +257,71 @@ fn normalise_path_comp(ctx: &EvalCtx, path_expr: &Path, face_system: &FaceSystem
     Ok(normalise_expr(ctx, &expr)?)
 }
 
+fn normalise_sigma_comp(ctx: &EvalCtx, sigma: &Sigma, face_system: &FaceSystem,
+        witness: &Term) -> EvalResult<Expr>
+{
+    let left_type = *sigma.left_type.clone();
+    let right_type = *sigma.right_type.clone();
+
+    let left_system = FaceSystem::from_iter(
+        face_system.faces
+            .iter()
+            .cloned()
+            .map(|(face, expr)| (face,
+                Expr::left_proj(Term::new(
+                    expr,
+                    Expr::Sigma(sigma.clone())
+                ))
+            ))
+    );
+
+    let right_system = FaceSystem::from_iter(
+        face_system.faces
+            .iter()
+            .cloned()
+            .map(|(face, expr)| (face,
+                Expr::right_proj(Term::new(
+                    expr,
+                    Expr::Sigma(sigma.clone())
+                ))
+            ))
+    );
+
+    let witness_left_proj = Term::new(Expr::left_proj(witness.clone()), left_type.expr.clone());
+    let witness_right_proj = Term::new(Expr::left_proj(witness.clone()), left_type.expr.clone());
+
+    let a = Expr::fill(
+        Var::new(0),
+        left_type.clone(),
+        left_system.clone(),
+        witness_left_proj.clone(),
+    );
+
+    let right_type_subbed = normalise_term(
+        &ctx.bind_term_var("", &a),
+        &right_type
+    )?;
+
+    let left_comp_ty = subst_interval_in_expr(left_type.expr.clone(), Var::new(0), IntervalDnf::One);
+    let right_comp_ty = subst_interval_in_expr(right_type_subbed.expr.clone(), Var::new(0), IntervalDnf::One);
+
+    let left_comp = Expr::comp(
+        left_type.clone(),
+        left_system.clone(),
+        witness_left_proj.clone()
+    );
+    let right_comp = Expr::comp(
+        right_type_subbed,
+        right_system,
+        witness_right_proj.clone()
+    );
+
+    Ok(Expr::pair(
+        Term::new(left_comp, left_comp_ty),
+        Term::new(right_comp, right_comp_ty)
+    ))
+}
+
 fn normalise_comp(ctx: &EvalCtx, comp: &Composition) -> EvalResult<Expr> {
     let bound_ctx = &ctx.bind_interval_var("");
     let space = normalise_term(bound_ctx, &comp.space)?;
@@ -226,10 +329,10 @@ fn normalise_comp(ctx: &EvalCtx, comp: &Composition) -> EvalResult<Expr> {
     let witness = normalise_term(ctx, &comp.witness)?;
 
     if let Expr::System(system) = system {
-        if let Expr::Path(path) = &space.expr {
-            normalise_path_comp(ctx, path, &comp.face_system, &comp.witness)
-        } else {
-            Ok(Expr::comp(space, system, witness))
+        match &space.expr {
+            Expr::Path(path) => normalise_path_comp(ctx, path, &comp.face_system, &comp.witness),
+            Expr::Sigma(sigma) => normalise_sigma_comp(ctx, sigma, &comp.face_system, &comp.witness),
+            _ => Ok(Expr::comp(space, system, witness))
         }
     } else {
         normalise_expr(&ctx.define_interval_var("", IntervalDnf::One), &system)
