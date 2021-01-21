@@ -27,9 +27,9 @@ Feature checklist:
 - [x] Kan filling
 - [x] Sigma types
 - [ ] Other operations derived from comp
-    - [ ] transport
-    - [ ] contraction
-    - [ ] pres
+    - [x] transport
+    - [x] contraction
+    - [x] pres
     - [ ] equiv
 - [ ] Glueing
 - [ ] Universes

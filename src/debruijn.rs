@@ -107,5 +107,9 @@ pub fn increment_debruijn_index(num: usize, expr: Expr) -> Expr {
         Expr::Contr(contr_elim) => Expr::contr_elim(
             increment_debruijn_index_in_term(num, *contr_elim.proof),
             increment_debruijn_index_in_system(num, contr_elim.face_system)),
+        Expr::Pres(pres) => Expr::pres(
+            increment_debruijn_index_in_term(num, *pres.function),
+            increment_debruijn_index_in_system(num, pres.face_system),
+            increment_debruijn_index_in_term(num, *pres.witness)),
     }
 }

@@ -46,6 +46,7 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
         Expr::Comp(comp) => normalise_comp(ctx, comp),
         Expr::Fill(kan_fill) => normalise_kan_fill(ctx, kan_fill.clone()),
         Expr::Contr(contr_elim) => normalise_contr_elim(ctx, contr_elim),
+        Expr::Pres(pres) => normalise_pres(ctx, pres),
     }
 }
 
@@ -332,6 +333,7 @@ fn normalise_comp(ctx: &EvalCtx, comp: &Composition) -> EvalResult<Expr> {
 
     if let Expr::System(system) = system {
         match &space.expr {
+            // pi types are handled in normalise_app
             Expr::Path(path) => normalise_path_comp(ctx, path, &comp.face_system, &comp.witness),
             Expr::Sigma(sigma) => normalise_sigma_comp(ctx, sigma, &comp.face_system, &comp.witness),
             _ => Ok(Expr::comp(space, system, witness))
@@ -355,13 +357,13 @@ fn subst_degeneracy(expr: Expr, var: Var) -> Expr {
 }
 
 fn subst_degeneracy_into_system(face_system: FaceSystem, witness: Expr, var: Var) -> EvalResult<FaceSystem> {
-    match subst_degeneracy(Expr::System(face_system), var) {
+    unwrap_pattern! {
+        subst_degeneracy(Expr::System(face_system), var);
         Expr::System(mut face_system) => {
             let new_face = Face::with_sides(&[(var, ZeroOne::Zero)]);
             face_system.faces.push((new_face, witness));
             Ok(face_system)
-        },
-        _ => panic!()
+        }
     }
 }
 
@@ -419,6 +421,40 @@ fn normalise_contr_elim(ctx: &EvalCtx, contr_elim: &ContrElim) -> EvalResult<Exp
     );
 
     Ok(Expr::comp(*space, face_system, proof_lproj))
+}
+
+fn normalise_pres(ctx: &EvalCtx, pres: &Pres) -> EvalResult<Expr> {
+    let f_i0 = subst_interval_in_term(*pres.function.clone(), Var::new(0), IntervalDnf::Zero);
+    let (f_src, f_tgt) = unwrap_pattern! {
+        &f_i0.type_expr; Expr::Pi(pi) =>
+            (*pi.source.clone(), *pi.target.clone())
+    };
+    let a0 = Term::new(Expr::app(f_i0, *pres.witness.clone()), f_tgt.expr.clone());
+
+    let v = Term::new(
+        Expr::fill(
+            Var::new(0),
+            Term::new_type(f_src.expr.clone()),
+            pres.face_system.clone(),
+            increment_debruijn_index_in_term(1, *pres.witness.clone())
+        ),
+        pres.witness.type_expr.clone()
+    );
+
+    let mut face_system = pres.face_system.clone();
+    let new_face = Face::with_sides(&[(Var::new(0), ZeroOne::One)]);
+    face_system.faces.push((new_face, Expr::app(*pres.function.clone(), v)));
+
+    let path = Expr::path_bind(Term::new(
+        Expr::comp(
+            f_tgt.clone(),
+            face_system,
+            a0
+        ),
+        f_tgt.expr
+    ));
+
+    normalise_expr(ctx, &path)
 }
 
 fn normalise_system(ctx: &EvalCtx, system: &FaceSystem) -> EvalResult<Expr> {

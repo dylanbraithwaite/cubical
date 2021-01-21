@@ -116,6 +116,12 @@ ast_types! {
         pub face_system: FaceSystem,
     }
 
+    pub struct Pres {
+        pub function: Box<Term>,
+        pub face_system: FaceSystem,
+        pub witness: Box<Term>,
+    }
+
     pub enum Expr {
         Var(Var),
         Type,
@@ -138,6 +144,7 @@ ast_types! {
         Comp(Composition),
         Fill(KanFill),
         Contr(ContrElim),
+        Pres(Pres),
         UnitVal,
     }
 }
@@ -227,6 +234,10 @@ impl Expr {
     pub fn right_proj(pair: Term) -> Expr {
         Expr::RightProj(RightProj::new(pair))
     }
+
+    pub fn pres(function: Term, face_system: FaceSystem, witness: Term) -> Expr {
+        Expr::Pres(Pres::new(function, face_system, witness))
+    }
 }
 
 impl Var {
@@ -264,6 +275,16 @@ impl Term {
 }
 
 // TODO: A derive macro for these?
+
+impl Pres {
+    pub fn new(function: Term, face_system: FaceSystem, witness: Term) -> Self {
+        Pres {
+            function: Box::new(function),
+            face_system,
+            witness: Box::new(witness),
+        }
+    }
+}
 
 impl ContrElim {
     pub fn new(proof: Term, face_system: FaceSystem) -> Self {
@@ -430,6 +451,7 @@ impl Display for Expr {
             Expr::Comp(comp) => write!(f, "{}", comp),
             Expr::Fill(kan_fill) => write!(f, "{}", kan_fill),
             Expr::Contr(contr_elim) => write!(f, "{}", contr_elim),
+            Expr::Pres(pres) => write!(f, "{}", pres),
         }
     }
 }
@@ -525,6 +547,12 @@ impl Display for KanFill {
 impl Display for ContrElim {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Contr {} {}", self.proof, self.face_system)
+    }
+}
+
+impl Display for Pres {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Pres {} {} {}", self.function, self.face_system, self.witness)
     }
 }
 
