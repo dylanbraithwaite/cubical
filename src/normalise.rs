@@ -6,6 +6,7 @@ use crate::interval::{IntervalDnf, IsNegated, normalise_interval};
 use crate::subst::{subst_interval_in_expr, subst_interval_in_term};
 use crate::util::types::ZeroOne;
 use crate::debruijn::*;
+use crate::unwrap_pattern;
 
 pub type EvalCtx = Context;
 
@@ -44,6 +45,7 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
         Expr::System(system) => normalise_system(ctx, system),
         Expr::Comp(comp) => normalise_comp(ctx, comp),
         Expr::Fill(kan_fill) => normalise_kan_fill(ctx, kan_fill.clone()),
+        Expr::Contr(contr_elim) => normalise_contr_elim(ctx, contr_elim),
     }
 }
 
@@ -370,6 +372,53 @@ fn normalise_kan_fill(ctx: &EvalCtx, kan_fill: KanFill) -> EvalResult<Expr> {
     let space = Term::new_type(subst_degeneracy(kan_fill.space.expr, var));
     let expr = Expr::comp(space, face_system, witness);
     normalise_expr(ctx, &expr)
+}
+
+fn normalise_contr_elim(ctx: &EvalCtx, contr_elim: &ContrElim) -> EvalResult<Expr> {
+    // [[proof]] : (x: A) * ((y: A) -> Path A x y)
+    let proof = normalise_term(ctx, &contr_elim.proof)?;
+
+    let proof_ty = unwrap_pattern! {
+        &proof.type_expr; Expr::Sigma(sigma) => sigma.clone()
+    };
+
+    let proof_lproj = Term::new(
+        Expr::left_proj(proof.clone()),
+        proof_ty.left_type.expr.clone());
+
+    // The right hand type is dependent on the left. Subst the left projection
+    // into right hand type to get a concrete type.
+    let proof_right_type = normalise_term(
+        &ctx.define_term_var("", &proof_lproj),
+        &proof_ty.right_type)?;
+
+    let proof_rproj = Term::new(
+        Expr::right_proj(proof.clone()),
+        proof_right_type.expr);
+
+    let space = proof_ty.left_type;
+
+    let face_system = FaceSystem::from_iter(
+        contr_elim.face_system.faces
+            .iter()
+            .cloned()
+            .map(|(face, expr)| {
+                let contr_path = Expr::app(
+                    proof_rproj.clone(),
+                    Term::new(expr, space.expr.clone())
+                );
+                let contr_path_ty = unwrap_pattern! {
+                    &proof_rproj.type_expr; Expr::Pi(pi) => pi.target.expr.clone()
+                };
+                let contr = Expr::path_app(
+                    Term::new(contr_path, contr_path_ty),
+                    IntervalDnf::single(Var::new(0), IsNegated::NotNegated)
+                );
+                (face, contr)
+            })
+    );
+
+    Ok(Expr::comp(*space, face_system, proof_lproj))
 }
 
 fn normalise_system(ctx: &EvalCtx, system: &FaceSystem) -> EvalResult<Expr> {

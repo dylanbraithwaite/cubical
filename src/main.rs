@@ -10,6 +10,7 @@ mod elaborate;
 mod face;
 mod subst;
 mod debruijn;
+mod typeinf;
 
 use std::io::{BufRead, stdin};
 

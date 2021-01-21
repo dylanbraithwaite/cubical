@@ -2,6 +2,7 @@ use itertools::Itertools;
 
 use crate::var_target::VarTarget;
 use crate::ast::*;
+use crate::typeinf::*;
 use crate::interval::{Interval, IntervalDnf};
 use crate::face::Face;
 
@@ -282,11 +283,12 @@ fn elaborate_app(ctx: &Context, e1: &Syntax, e2: &Syntax) -> ElaborationResult<T
                 return Err(ElaborationErr::WrongFunctionArgumentType);
             }
 
-            let expr_ty = pi.target.expr.clone();
+            let app = App::new(e1, e2);
 
-            let expr = Expr::app(e1, e2);
+            let expr_ty = infer_app(ctx, &app);
+            let expr = Expr::App(app);
+
             let term = Term::new(expr, expr_ty);
-
             Ok(term)
         },
         Expr::Path(path) => {

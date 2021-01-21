@@ -4,6 +4,16 @@ use crate::interval::IntervalDnf;
 use crate::face::Face;
 
 #[macro_export]
+macro_rules! unwrap_pattern {
+    ($in_expr: expr; $( $pattern: pat )|+ => $out_expr: expr) => {
+        match $in_expr {
+            $( $pattern )|+ => $out_expr,
+            _ => panic!("Failed to unwrap pattern"),
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! ast_types {
     () => {};
     ($i: item $($is: item)*) => {
@@ -98,6 +108,14 @@ ast_types! {
         pub witness: Box<Term>,
     }
 
+    pub struct ContrElim {
+        /// A proof of contractability is a term of type
+        /// `Sigma (x: A) (Pi (y: A) -> Path A x y)`
+        pub proof: Box<Term>,
+
+        pub face_system: FaceSystem,
+    }
+
     pub enum Expr {
         Var(Var),
         Type,
@@ -119,6 +137,7 @@ ast_types! {
         RightProj(RightProj),
         Comp(Composition),
         Fill(KanFill),
+        Contr(ContrElim),
         UnitVal,
     }
 }
@@ -164,6 +183,33 @@ impl Expr {
 
     pub fn fill(var: Var, space: Term, face_system: FaceSystem, witness: Term) -> Expr {
         Expr::Fill(KanFill::new(var, space, face_system, witness))
+    }
+
+    // transp i A a = comp i A [] a
+    pub fn transp(space: Term, witness: Term) -> Expr {
+        let face_system = FaceSystem::new([]);
+        Expr::Comp(Composition::new(space, face_system, witness))
+    }
+
+    /// Constructs a term
+    /// `isContr A = Sigma (x: A) (Pi (y: A) -> Path A x y)`
+    /// representing the contractibility of a space.
+    pub fn contr_prop(space: Term) -> Expr {
+        Expr::sigma (
+            space.clone(),
+            Term::new_type(Expr::pi (
+                space.clone(),
+                Term::new_type(Expr::path (
+                    space.clone(),
+                    Term::new(Expr::var(1), space.expr.clone()),
+                    Term::new(Expr::var(0), space.expr)
+                ))
+            ))
+        )
+    }
+
+    pub fn contr_elim(proof: Term, system: FaceSystem) -> Expr {
+        Expr::Contr(ContrElim::new(proof, system))
     }
 
     pub fn sigma(left_type: Term, right_type: Term) -> Expr {
@@ -219,6 +265,15 @@ impl Term {
 
 // TODO: A derive macro for these?
 
+impl ContrElim {
+    pub fn new(proof: Term, face_system: FaceSystem) -> Self {
+        ContrElim {
+            proof: Box::new(proof),
+            face_system,
+        }
+    }
+}
+
 impl KanFill {
     pub fn new(var: Var, space: Term, face_system: FaceSystem, witness: Term) -> Self {
         KanFill {
@@ -249,7 +304,7 @@ impl FaceSystem {
         }
     }
 
-    pub fn from_iter<T>(face_iter: T) -> Self 
+    pub fn from_iter<T>(face_iter: T) -> Self
         where T: IntoIterator<Item = (Face, Expr)>
     {
         FaceSystem {
@@ -374,6 +429,7 @@ impl Display for Expr {
             Expr::System(system) => write!(f, "{}", system),
             Expr::Comp(comp) => write!(f, "{}", comp),
             Expr::Fill(kan_fill) => write!(f, "{}", kan_fill),
+            Expr::Contr(contr_elim) => write!(f, "{}", contr_elim),
         }
     }
 }
@@ -466,6 +522,12 @@ impl Display for KanFill {
     }
 }
 
+impl Display for ContrElim {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Contr {} {}", self.proof, self.face_system)
+    }
+}
+
 impl Display for Face {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "(")?;
@@ -491,7 +553,7 @@ impl Display for IntervalDnf {
             IntervalDnf::Zero => write!(f, "0"),
             IntervalDnf::One => write!(f, "1"),
             //IntervalDnf::Conjunctions(terms) => write!(f, "Or({:#?})", terms)
-            IntervalDnf::Conjunction(term) => write!(f, "Or({:#?})", term)
+            IntervalDnf::Conjunction(term) => write!(f, "{:#?}", term)
         }
     }
 }

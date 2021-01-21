@@ -95,6 +95,9 @@ pub fn subst_interval_in_expr(expr: Expr, var: Var, interval: IntervalDnf) -> Ex
             kan_fill.var,
             subst_interval_in_term(*kan_fill.space, var, interval.clone()),
             subst_interval_in_system(kan_fill.face_system, var, interval.clone()),
-            subst_interval_in_term(*kan_fill.witness, var, interval))
+            subst_interval_in_term(*kan_fill.witness, var, interval)),
+        Expr::Contr(contr_elim) => Expr::contr_elim(
+            subst_interval_in_term(*contr_elim.proof, var, interval.clone()),
+            subst_interval_in_system(contr_elim.face_system, var, interval))
     }
 }
