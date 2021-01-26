@@ -116,6 +116,12 @@ ast_types! {
         pub face_system: FaceSystem,
     }
 
+    pub struct EquivElim {
+        pub equiv: Box<Term>,
+        pub face_system: FaceSystem,
+        pub witness: Box<Term>,
+    }
+
     pub struct Pres {
         pub function: Box<Term>,
         pub face_system: FaceSystem,
@@ -144,6 +150,7 @@ ast_types! {
         Comp(Composition),
         Fill(KanFill),
         Contr(ContrElim),
+        Equiv(EquivElim),
         Pres(Pres),
         UnitVal,
     }
@@ -238,6 +245,53 @@ impl Expr {
     pub fn pres(function: Term, face_system: FaceSystem, witness: Term) -> Expr {
         Expr::Pres(Pres::new(function, face_system, witness))
     }
+
+    /// Gives a term:
+    /// isContr (Sigma (x: Source) Path A y (f x))
+    /// in the context [ y: A ]
+    fn equiv_prop_inner(source: Term, target:Term, func: Term) -> Expr {
+        Expr::contr_prop(
+            Term::new_type(Expr::sigma(
+                source.clone(),
+                Term::new_type(Expr::path(
+                    target.clone(),
+                    Term::new(Expr::var(1), target.expr.clone()),
+                    Term::new(
+                        Expr::app(
+                            func,
+                            Term::new(Expr::var(0), source.expr.clone())
+                        ),
+                        target.expr.clone()
+                    )
+                ))
+            ))
+        )
+    }
+
+    /// isEquiv T A f = Pi (y: A) -> isContr (Sigma (x: T) Path A y (f x))
+    pub fn equiv_prop(source: Term, target: Term, func: Term) -> Expr {
+        Expr::pi(
+            target.clone(),
+            Term::new_type(Expr::equiv_prop_inner(source, target, func))
+        )
+    }
+
+    /// Equiv T A = Sigma (f: T -> A) isEquiv T A f
+    pub fn equiv_type(source: Term, target: Term) -> Expr {
+        let func_ty = Expr::pi(source.clone(), target.clone());
+        Expr::sigma(
+            Term::new_type(func_ty.clone()),
+            Term::new_type(Expr::equiv_prop(
+                source,
+                target,
+                Term::new(Expr::var(0), func_ty)
+            ))
+        )
+    }
+
+    pub fn equiv_elim(equiv: Term, system: FaceSystem, witness: Term) -> Expr {
+        Expr::Equiv(EquivElim::new(equiv, system, witness))
+    }
 }
 
 impl Var {
@@ -291,6 +345,16 @@ impl ContrElim {
         ContrElim {
             proof: Box::new(proof),
             face_system,
+        }
+    }
+}
+
+impl EquivElim {
+    pub fn new(equiv: Term, face_system: FaceSystem, witness: Term) -> Self {
+        EquivElim {
+            equiv: Box::new(equiv),
+            face_system,
+            witness: Box::new(witness),
         }
     }
 }
@@ -451,6 +515,7 @@ impl Display for Expr {
             Expr::Comp(comp) => write!(f, "{}", comp),
             Expr::Fill(kan_fill) => write!(f, "{}", kan_fill),
             Expr::Contr(contr_elim) => write!(f, "{}", contr_elim),
+            Expr::Equiv(equiv_elim) => write!(f, "{}", equiv_elim),
             Expr::Pres(pres) => write!(f, "{}", pres),
         }
     }
@@ -547,6 +612,12 @@ impl Display for KanFill {
 impl Display for ContrElim {
     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         write!(f, "Contr {} {}", self.proof, self.face_system)
+    }
+}
+
+impl Display for EquivElim {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
+        write!(f, "Equiv {} {} {}", self.equiv, self.face_system, self.witness)
     }
 }
 

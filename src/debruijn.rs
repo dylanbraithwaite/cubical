@@ -111,5 +111,10 @@ pub fn increment_debruijn_index(num: usize, expr: Expr) -> Expr {
             increment_debruijn_index_in_term(num, *pres.function),
             increment_debruijn_index_in_system(num, pres.face_system),
             increment_debruijn_index_in_term(num, *pres.witness)),
+        Expr::Equiv(equiv_elim) => Expr::equiv_elim(
+            increment_debruijn_index_in_term(num, *equiv_elim.equiv),
+            increment_debruijn_index_in_system(num, equiv_elim.face_system),
+            increment_debruijn_index_in_term(num, *equiv_elim.witness),
+        )
     }
 }

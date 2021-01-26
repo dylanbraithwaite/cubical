@@ -102,6 +102,11 @@ pub fn subst_interval_in_expr(expr: Expr, var: Var, interval: IntervalDnf) -> Ex
         Expr::Pres(pres) => Expr::pres(
             subst_interval_in_term(*pres.function, var, interval.clone()),
             subst_interval_in_system(pres.face_system, var, interval.clone()),
-            subst_interval_in_term(*pres.witness, var, interval))
+            subst_interval_in_term(*pres.witness, var, interval)),
+        Expr::Equiv(equiv_elim) => Expr::equiv_elim(
+            subst_interval_in_term(*equiv_elim.equiv, var, interval.clone()),
+            subst_interval_in_system(equiv_elim.face_system, var, interval.clone()),
+            subst_interval_in_term(*equiv_elim.witness, var, interval)
+        )
     }
 }

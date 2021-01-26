@@ -46,6 +46,7 @@ pub fn normalise_expr(ctx: &EvalCtx, expr: &Expr) -> EvalResult<Expr> {
         Expr::Comp(comp) => normalise_comp(ctx, comp),
         Expr::Fill(kan_fill) => normalise_kan_fill(ctx, kan_fill.clone()),
         Expr::Contr(contr_elim) => normalise_contr_elim(ctx, contr_elim),
+        Expr::Equiv(equiv_elim) => normalise_equiv_elim(ctx, equiv_elim),
         Expr::Pres(pres) => normalise_pres(ctx, pres),
     }
 }
@@ -421,6 +422,46 @@ fn normalise_contr_elim(ctx: &EvalCtx, contr_elim: &ContrElim) -> EvalResult<Exp
     );
 
     Ok(Expr::comp(*space, face_system, proof_lproj))
+}
+
+fn normalise_equiv_elim(ctx: &EvalCtx, equiv_elim: &EquivElim) -> EvalResult<Expr> {
+    let equiv_sigma = unwrap_pattern! {
+        &equiv_elim.equiv.type_expr; Expr::Sigma(sigma) => sigma
+    };
+    let equiv_left_proj = Term::new(
+        Expr::left_proj(*equiv_elim.equiv.clone()),
+        equiv_sigma.left_type.expr.clone()
+    );
+    let equiv_right_type = normalise_expr(
+        &ctx.define_term_var("", &equiv_left_proj),
+        &equiv_sigma.right_type.expr
+    )?;
+
+    let equiv_right_type_target = unwrap_pattern! {
+        &equiv_right_type; Expr::Pi(pi) => &pi.target.expr
+    };
+
+    let equiv_right_type_target = normalise_expr(
+        &ctx.define_term_var("", &equiv_elim.witness),
+        equiv_right_type_target)?;
+
+    let contr_elim = ContrElim::new(
+        Term::new(
+            Expr::app(
+                Term::new(
+                    Expr::right_proj(
+                        *equiv_elim.equiv.clone()
+                    ),
+                    equiv_right_type
+                ),
+                *equiv_elim.witness.clone()
+            ),
+            equiv_right_type_target
+        ),
+        equiv_elim.face_system.clone()
+    );
+
+    normalise_contr_elim(ctx, &contr_elim)
 }
 
 fn normalise_pres(ctx: &EvalCtx, pres: &Pres) -> EvalResult<Expr> {
