@@ -26,11 +26,11 @@ Feature checklist:
 - [x] Composition
 - [x] Kan filling
 - [x] Sigma types
-- [ ] Other operations derived from comp
+- [x] Other operations derived from comp
     - [x] transport
     - [x] contraction
     - [x] pres
-    - [ ] equiv
+    - [x] equiv
 - [ ] Glueing
 - [ ] Universes
 
