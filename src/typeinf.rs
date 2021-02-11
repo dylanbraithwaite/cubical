@@ -1,13 +1,9 @@
 use crate::unwrap_pattern;
-use crate::context::Context;
-use crate::normalise::normalise_expr;
 use crate::ast::*;
+use crate::ast::traits::*;
 
-pub fn infer_app(ctx: &Context, app: &App) -> Expr {
-    let pi_type = normalise_expr(
-        &ctx.define_term_var("", &app.argument),
-        &app.func.type_expr
-    ).unwrap();
+pub fn infer_app(app: &App) -> Expr {
+    let pi_type = app.func.type_expr.clone().substitute_expr(app.argument.expr.clone(), 0);
 
     unwrap_pattern!{
         pi_type; Expr::Pi(pi) => pi.target.expr.clone()

@@ -3,9 +3,9 @@ use cons_list::ConsList;
 use crate::syntax::expr::Variable;
 use crate::interval::IntervalDnf;
 use crate::ast::{Expr, Term, Var};
+use crate::ast::traits::DeBruijnIndexed;
 use crate::face::Face;
 use crate::var_target::VarTarget;
-use crate::debruijn::*;
 use crate::util::types::ZeroOne;
 
 #[derive(Clone, Debug)]
@@ -39,7 +39,7 @@ impl Context {
             })
             .enumerate()
             .find(|(_, (u, _))| *u == var)
-            .map(|(i, (_, v))| (i, increment_debruijn_index_in_var_target(i + 1, v.clone())))
+            .map(|(i, (_, v))| (i, v.clone().increment_indices_by(i+1)))
     }
 
     pub fn define_term_var(&self, v: &str, term: &Term) -> Context {
@@ -90,8 +90,7 @@ impl Context {
         let Context(ctx) = self;
         ctx.iter()
             .filter_map(|entry| match entry {
-                CtxEntry::Var(_ , vt) => Some(
-                    increment_debruijn_index_in_var_target(i, vt.clone())),
+                CtxEntry::Var(_ , vt) => Some(vt.clone().increment_indices_by(i+1)),
                 CtxEntry::Face(_) => None,
             })
             .nth(i)

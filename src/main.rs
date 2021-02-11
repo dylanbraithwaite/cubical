@@ -1,6 +1,5 @@
 mod util;
 mod syntax;
-mod normalise;
 mod ast;
 mod var_target;
 mod toplevel;
@@ -8,8 +7,6 @@ mod interval;
 mod context;
 mod elaborate;
 mod face;
-mod subst;
-mod debruijn;
 mod typeinf;
 
 use std::io::{BufRead, stdin};

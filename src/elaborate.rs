@@ -2,14 +2,13 @@ use itertools::Itertools;
 
 use crate::var_target::VarTarget;
 use crate::ast::*;
+use crate::ast::traits::*;
 use crate::typeinf::*;
 use crate::interval::{Interval, IntervalDnf};
 use crate::face::Face;
 
 use crate::syntax::expr::Expr as Syntax;
 use crate::syntax::expr::Face as FaceSyntax;
-
-use crate::normalise::{normalise_expr, normalise_term};
 
 use crate::context::Context;
 
@@ -87,12 +86,9 @@ fn elaborate_comp(ctx: &Context, var: &str, ty: &Syntax, faces: &[(FaceSyntax, S
         return Err(ElaborationErr::CompositionHasIncompatibleTypes)
     }
 
-    let witness = elaborate_term(&bound_ctx, witness)?;
+    let witness = elaborate_term(ctx, witness)?;
 
-    let ty_i0 = normalise_expr(
-        &ctx.define_interval_var(var, IntervalDnf::Zero),
-        &ty.expr
-    ).unwrap();
+    let ty_i0 = ty.expr.clone().substitute_interval(IntervalDnf::Zero, 0);
 
     if witness.type_expr != ty_i0 {
         return Err(ElaborationErr::CompositionHasIncompatibleWitnessType)
@@ -101,21 +97,18 @@ fn elaborate_comp(ctx: &Context, var: &str, ty: &Syntax, faces: &[(FaceSyntax, S
     for (face, expr) in &faces.faces {
         if !exprs_equal_nf(
             &ctx.define_interval_var(var, IntervalDnf::Zero).with_face_restriction(face),
-            &witness.expr,
+            &witness.expr.clone().increment_indices(),
             expr)
         {
             return Err(ElaborationErr::CompositionHasIncompatibleFaces(
-                format!("{}  {}", witness.expr, expr)
+                format!("{} != {}", witness.expr, expr)
             ))
         }
     }
 
-    let ty_i1 = normalise_expr(
-        &ctx.define_interval_var(var, IntervalDnf::One),
-        &ty.expr
-    ).unwrap();
+    let ty_i1 = ty.expr.clone().substitute_interval(IntervalDnf::One, 0);
 
-    let expr = Expr::Comp(Composition::new(ty, faces, witness));
+    let expr = Expr::comp(ty, faces, witness);
     let term = Term::new(expr, ty_i1);
     Ok(term)
 }
@@ -285,7 +278,7 @@ fn elaborate_app(ctx: &Context, e1: &Syntax, e2: &Syntax) -> ElaborationResult<T
 
             let app = App::new(e1, e2);
 
-            let expr_ty = infer_app(ctx, &app);
+            let expr_ty = infer_app(&app);
             let expr = Expr::App(app);
 
             let term = Term::new(expr, expr_ty);
@@ -326,17 +319,10 @@ fn elaborate_path_bind(ctx: &Context, var: &str, body: &Syntax) -> ElaborationRe
         body
     )?;
 
-    let path_space = Term::new_type(body.type_expr.clone());
+    let path_start = body.clone().substitute_interval(IntervalDnf::Zero, 0);
+    let path_end = body.clone().substitute_interval(IntervalDnf::One, 0);
 
-    let path_start = {
-        let ctx = ctx.define_interval_var(var, IntervalDnf::Zero);
-        normalise_term(&ctx, &body).unwrap()
-    };
-
-    let path_end = {
-        let ctx = ctx.define_interval_var(var, IntervalDnf::One);
-        normalise_term(&ctx, &body).unwrap()
-    };
+    let path_space = Term::new_type(path_start.type_expr.clone());
 
     let path_type_expr = Expr::path(path_space, path_start, path_end);
     let expr = Expr::path_bind(body);
@@ -376,8 +362,8 @@ fn elaborate_interval(ctx: &Context, expr: &Syntax) -> ElaborationResult<Interva
 fn exprs_equal_nf(ctx: &Context, e1: &Expr, e2: &Expr) -> bool {
     if ctx.faces_inconsistent() { return true }
 
-    let e1 = normalise_expr(&ctx, e1).unwrap();
-    let e2 = normalise_expr(&ctx, e2).unwrap();
+    let e1 = e1.clone().normalise(ctx);
+    let e2 = e2.clone().normalise(ctx);
 
     e1 == e2
 }

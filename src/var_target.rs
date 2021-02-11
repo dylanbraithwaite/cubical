@@ -1,5 +1,6 @@
 use crate::interval::IntervalDnf;
 use crate::ast::{Term, Expr};
+use crate::ast::traits::DeBruijnIndexed;
 
 /// Enumerates the kinds of thing that a variable can refer to
 #[derive(Clone, Debug)]
@@ -23,4 +24,18 @@ pub enum VarTarget {
     /// Represents a variable, contained in the body of a path binding expression,
     /// which has yet to be substituted for a value.
     BoundInterval,
+}
+
+impl DeBruijnIndexed for VarTarget {
+    fn increment_indices_from_by(self, start: usize, amount: usize) -> Self {
+        match self {
+            VarTarget::Term(term) => VarTarget::Term(
+                term.increment_indices_from_by(start, amount)),
+            VarTarget::Interval(int) => VarTarget::Interval(
+                int.increment_indices_from_by(start, amount)),
+            VarTarget::BoundTerm(ty) => VarTarget::BoundTerm(
+                ty.increment_indices_from_by(start, amount)),
+            VarTarget::BoundInterval => VarTarget::BoundInterval,
+        }
+    }
 }

@@ -1,16 +1,15 @@
 use crate::context::Context;
 use crate::elaborate::{ElaborationErr, elaborate_term};
-use crate::normalise::{normalise_term, EvalErr};
 use crate::syntax;
 use crate::toplevel;
 use crate::toplevel::command::Command;
+use crate::ast::traits::*;
 
 #[derive(Debug)]
 pub enum ReplErr {
     Parse(syntax::ParseError),
     Elab(ElaborationErr),
     TopLevel(toplevel::TopLevelErr),
-    Eval(EvalErr),
 }
 
 pub fn execute_command(ctx: &mut Context, source: &str) -> Result<String, ReplErr> {
@@ -20,7 +19,8 @@ pub fn execute_command(ctx: &mut Context, source: &str) -> Result<String, ReplEr
             Command::Eval(expr_source) => {
                 let expr = syntax::parse_from_source(expr_source).map_err(Parse)?;
                 let ast = elaborate_term(ctx, &expr).map_err(Elab)?;
-                let normalised = normalise_term(&ctx, &ast).map_err(Eval)?;
+                println!("Evaluating: {}", ast);
+                let normalised = ast.normalise(&ctx);
                 Ok(format!("{}", normalised.expr))
             },
             Command::TypeInfer(expr_source) => {

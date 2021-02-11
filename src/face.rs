@@ -1,5 +1,7 @@
 use std::collections::HashSet;
 
+use crate::ast::traits::*;
+use crate::ast::Expr;
 use crate::ast_types;
 use crate::util::types::ZeroOne;
 use crate::ast::Var;
@@ -93,24 +95,70 @@ pub fn expand_interval_into_face(interval: &IntervalDnf, negated: bool) -> Face 
     }
 }
 
-/// For each interval defined in the context, substitute it into the face
-fn normalise_face(ctx: &Context, face: &Face) -> Face {
-    match face {
-        Face::Top => Face::Top,
-        Face::Bottom => Face::Bottom,
-        Face::Conjunctions { ones, zeroes }=> {
-            let mut ones = ones.clone();
-            let mut zeroes = zeroes.clone();
-            let mut accum = Face::Top;
-            for (var, ref interval) in ctx.intervals() {
-                if ones.remove(&var) {
-                    accum = Face::meet(accum, expand_interval_into_face(interval, false));
+impl Evaluate for Face {
+    type Evaluated = Face;
+
+    fn evaluate(self, ctx: &Context) -> Face {
+        match self {
+            Face::Top => Face::Top,
+            Face::Bottom => Face::Bottom,
+            Face::Conjunctions { mut ones, mut zeroes }=> {
+                let mut accum = Face::Top;
+                for (var, ref interval) in ctx.intervals() {
+                    if ones.remove(&var) {
+                        accum = Face::meet(accum, expand_interval_into_face(interval, false));
+                    }
+                    if zeroes.remove(&var) {
+                        accum = Face::meet(accum, expand_interval_into_face(interval, true));
+                    }
                 }
-                if zeroes.remove(&var) {
-                    accum = Face::meet(accum, expand_interval_into_face(interval, true));
+                Face::meet(accum, Face::conjunctions(ones, zeroes))
+            }
+        }
+    }
+}
+
+impl Normalise for Face {
+    fn normalise(self, ctx: &Context) -> Face {
+        self.evaluate(ctx)
+    }
+}
+
+impl DeBruijnIndexed for Face {
+    fn increment_indices_from_by(self, start: usize, amount: usize) -> Face {
+        match self {
+            Face::Top => Face::Top,
+            Face::Bottom => Face::Bottom,
+            Face::Conjunctions {ones, zeroes} => {
+                Face::Conjunctions {
+                    ones: ones.iter().map(|v| v.increment_indices_from_by(start, amount)).collect(),
+                    zeroes: zeroes.iter().map(|v| v.increment_indices_from_by(start, amount)).collect(),
                 }
             }
-            Face::meet(accum, Face::conjunctions(ones, zeroes))
+        }
+    }
+}
+
+impl Substitute for Face {
+    type ExprSubst = ();
+
+    fn substitute_expr(self, _: Expr, _: usize) { }
+
+    type IntervalSubst = Self;
+
+    fn substitute_interval(mut self, expr: IntervalDnf, var: usize) -> Self {
+        match &mut self {
+            Face::Top => Face::Top,
+            Face::Bottom => Face::Bottom,
+            Face::Conjunctions { ones, zeroes } => {
+                if ones.remove(&Var::new(var)) {
+                    Face::meet(self, expand_interval_into_face(&expr, false))
+                } else if zeroes.remove(&Var::new(var)) {
+                    Face::meet(self, expand_interval_into_face(&expr, true))
+                } else {
+                    self
+                }
+            }
         }
     }
 }
@@ -118,11 +166,8 @@ fn normalise_face(ctx: &Context, face: &Face) -> Face {
 pub fn faces_congruent(ctx: &Context, lhs: &Face, rhs: &Face) -> bool {
     let face_restriction = ctx.combined_face_formula();
 
-    let lhs = Face::meet(face_restriction.clone(), lhs.clone());
-    let lhs = normalise_face(ctx, &lhs);
-
-    let rhs = Face::meet(face_restriction, rhs.clone());
-    let rhs = normalise_face(ctx, &rhs);
+    let lhs = Face::meet(face_restriction.clone(), lhs.clone()).normalise(ctx);
+    let rhs = Face::meet(face_restriction, rhs.clone()).normalise(ctx);
 
     lhs == rhs
 }

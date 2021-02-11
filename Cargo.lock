@@ -11,6 +11,7 @@ name = "cubical"
 version = "0.1.0"
 dependencies = [
  "cons-list",
+ "either",
  "itertools",
 ]
 

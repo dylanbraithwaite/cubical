@@ -326,3 +326,12 @@ pub fn normalise_interval(ctx: &Context, interval: &IntervalDnf) -> IntervalDnf 
         }
     }
 }
+
+#[test]
+fn test_normalise_interval_to_zero() {
+    let ctx = Context::new().define_interval_var("", IntervalDnf::Zero);
+    let interval = IntervalDnf::single(Var::new(0), IsNegated::NotNegated);
+    let interval = normalise_interval(&ctx, &interval);
+
+    assert_eq!(interval, IntervalDnf::Zero)
+}
