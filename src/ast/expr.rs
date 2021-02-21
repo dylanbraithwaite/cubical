@@ -16,6 +16,7 @@ pub enum Expr {
     Pi(Pi),
     Path(Path),
     Sigma(Sigma),
+    GlueType(GlueType),
     UnitType,
 
     // Exprs
@@ -30,6 +31,8 @@ pub enum Expr {
     Contr(ContrElim),
     Equiv(EquivElim),
     Pres(Pres),
+    Glue(Glue),
+    Unglue(Unglue),
     UnitVal,
 }
 
@@ -57,6 +60,9 @@ impl Evaluate for Expr {
             Expr::Contr(contr_elim) => contr_elim.evaluate(ctx),
             Expr::Equiv(equiv_elim) => equiv_elim.evaluate(ctx),
             Expr::Pres(pres) => pres.evaluate(ctx),
+            Expr::GlueType(glue_type) => Expr::GlueType(glue_type.evaluate(ctx)),
+            Expr::Glue(glue) => Expr::Glue(glue.evaluate(ctx)),
+            Expr::Unglue(unglue) => Expr::Unglue(unglue.evaluate(ctx)),
         }
     }
 }
@@ -83,6 +89,9 @@ impl Normalise for Expr {
             Expr::Contr(contr_elim) => contr_elim.normalise(ctx),
             Expr::Equiv(equiv_elim) => equiv_elim.normalise(ctx),
             Expr::Pres(pres) => pres.normalise(ctx),
+            Expr::GlueType(glue_type) => Expr::GlueType(glue_type.normalise(ctx)),
+            Expr::Glue(glue) => Expr::Glue(glue.normalise(ctx)),
+            Expr::Unglue(unglue) => Expr::Unglue(unglue.normalise(ctx)),
         }
     }
 }
@@ -111,6 +120,9 @@ impl Substitute for Expr {
             Expr::Contr(contr_elim) => Expr::Contr(contr_elim.substitute_expr(expr, var)),
             Expr::Pres(pres) => Expr::Pres(pres.substitute_expr(expr, var)),
             Expr::Equiv(equiv_elim) => Expr::Equiv(equiv_elim.substitute_expr(expr, var)),
+            Expr::GlueType(glue_type) => Expr::GlueType(glue_type.substitute_expr(expr, var)),
+            Expr::Glue(glue) => Expr::Glue(glue.substitute_expr(expr, var)),
+            Expr::Unglue(unglue) => Expr::Unglue(unglue.substitute_expr(expr, var)),
         }
     }
 
@@ -142,6 +154,9 @@ impl Substitute for Expr {
             Expr::Contr(contr_elim) => Expr::Contr(contr_elim.substitute_interval(expr, var)),
             Expr::Pres(pres) => Expr::Pres(pres.substitute_interval(expr, var)),
             Expr::Equiv(equiv_elim) => Expr::Equiv(equiv_elim.substitute_interval(expr, var)),
+            Expr::GlueType(glue_type) => Expr::GlueType(glue_type.substitute_interval(expr, var)),
+            Expr::Glue(glue) => Expr::Glue(glue.substitute_interval(expr, var)),
+            Expr::Unglue(unglue) => Expr::Unglue(unglue.substitute_interval(expr, var)),
         }
     }
 }
@@ -168,6 +183,9 @@ impl DeBruijnIndexed for Expr {
             Expr::Contr(contr_elim) => Expr::Contr(contr_elim.increment_indices_from_by(start, amount)),
             Expr::Pres(pres) => Expr::Pres(pres.increment_indices_from_by(start, amount)),
             Expr::Equiv(equiv_elim) => Expr::Equiv(equiv_elim.increment_indices_from_by(start, amount)),
+            Expr::GlueType(glue_type) => Expr::GlueType(glue_type.increment_indices_from_by(start, amount)),
+            Expr::Glue(glue) => Expr::Glue(glue.increment_indices_from_by(start, amount)),
+            Expr::Unglue(unglue) => Expr::Unglue(unglue.increment_indices_from_by(start, amount)),
         }
     }
 }
@@ -194,6 +212,9 @@ impl Display for Expr {
             Expr::Contr(contr_elim) => write!(f, "{}", contr_elim),
             Expr::Equiv(equiv_elim) => write!(f, "{}", equiv_elim),
             Expr::Pres(pres) => write!(f, "{}", pres),
+            Expr::GlueType(glue_type) => write!(f, "{}", glue_type),
+            Expr::Glue(glue) => write!(f, "{}", glue),
+            Expr::Unglue(unglue) => write!(f, "{}", unglue),
         }
     }
 }

@@ -35,6 +35,12 @@ mod terms {
         pub mod equiv_elim;
         pub mod pres_elim;
     }
+
+    pub mod glueing {
+        pub mod glue_type;
+        pub mod glue;
+        pub mod unglue;
+    }
 }
 
 mod term;
@@ -65,6 +71,10 @@ pub use terms::face_systems::composition::Composition;
 pub use terms::face_systems::contr_elim::ContrElim;
 pub use terms::face_systems::equiv_elim::EquivElim;
 pub use terms::face_systems::pres_elim::Pres;
+
+pub use terms::glueing::glue_type::GlueType;
+pub use terms::glueing::glue::Glue;
+pub use terms::glueing::unglue::Unglue;
 
 #[macro_export]
 macro_rules! unwrap_pattern {
