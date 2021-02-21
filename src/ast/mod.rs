@@ -8,25 +8,33 @@ pub mod traits;
 mod terms {
     pub mod var;
 
-    pub mod pi;
-    pub mod lambda;
-    pub mod app;
+    pub mod functions {
+        pub mod pi;
+        pub mod lambda;
+        pub mod app;
+    }
 
-    pub mod sigma;
-    pub mod pair;
-    pub mod left_proj;
-    pub mod right_proj;
+    pub mod pairs {
+        pub mod sigma;
+        pub mod pair;
+        pub mod left_proj;
+        pub mod right_proj;
+    }
 
-    pub mod path;
-    pub mod path_bind;
-    pub mod path_app;
+    pub mod paths {
+        pub mod path;
+        pub mod path_bind;
+        pub mod path_app;
+    }
 
-    pub mod face_system;
-    pub mod composition;
+    pub mod face_systems {
+        pub mod face_system;
+        pub mod composition;
 
-    pub mod contr_elim;
-    pub mod equiv_elim;
-    pub mod pres_elim;
+        pub mod contr_elim;
+        pub mod equiv_elim;
+        pub mod pres_elim;
+    }
 }
 
 mod term;
@@ -38,25 +46,25 @@ pub use term::Term;
 
 pub use terms::var::Var;
 
-pub use terms::pi::Pi;
-pub use terms::lambda::Lambda;
-pub use terms::app::App;
+pub use terms::functions::pi::Pi;
+pub use terms::functions::lambda::Lambda;
+pub use terms::functions::app::App;
 
-pub use terms::sigma::Sigma;
-pub use terms::pair::Pair;
-pub use terms::left_proj::LeftProj;
-pub use terms::right_proj::RightProj;
+pub use terms::pairs::sigma::Sigma;
+pub use terms::pairs::pair::Pair;
+pub use terms::pairs::left_proj::LeftProj;
+pub use terms::pairs::right_proj::RightProj;
 
-pub use terms::path::Path;
-pub use terms::path_app::PathApp;
-pub use terms::path_bind::PathBind;
+pub use terms::paths::path::Path;
+pub use terms::paths::path_app::PathApp;
+pub use terms::paths::path_bind::PathBind;
 
-pub use terms::face_system::FaceSystem;
-pub use terms::composition::Composition;
+pub use terms::face_systems::face_system::FaceSystem;
+pub use terms::face_systems::composition::Composition;
 
-pub use terms::contr_elim::ContrElim;
-pub use terms::equiv_elim::EquivElim;
-pub use terms::pres_elim::Pres;
+pub use terms::face_systems::contr_elim::ContrElim;
+pub use terms::face_systems::equiv_elim::EquivElim;
+pub use terms::face_systems::pres_elim::Pres;
 
 #[macro_export]
 macro_rules! unwrap_pattern {
